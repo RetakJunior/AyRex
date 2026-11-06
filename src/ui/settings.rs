@@ -39,9 +39,11 @@ pub(crate) fn show_settings(ui: &mut egui::Ui, state: &mut AppState) {
     ui.heading("Kayıt ve Yayın");
     ui.add_space(8.0);
     ui.add_enabled_ui(state.recorder.is_none(), |ui| {
+        #[cfg(windows)]
         let dxgi_available = state
             .selected_display()
             .is_some_and(|display| display.dxgi_output_index.is_some());
+        #[cfg(windows)]
         ui.add_enabled_ui(dxgi_available, |ui| {
             ui.checkbox(
                 &mut state.settings.use_desktop_duplication,
@@ -49,7 +51,10 @@ pub(crate) fn show_settings(ui: &mut egui::Ui, state: &mut AppState) {
             );
         });
         if !dxgi_available {
+            #[cfg(windows)]
             ui.small("Seçilen ekran DXGI ile eşleşmedi; GDI yakalama kullanılır.");
+            #[cfg(target_os = "linux")]
+            ui.small("Linux ekran yakalama için X11 oturumu gerekir; Wayland desteklenmiyor.");
         }
 
         ui.horizontal(|ui| {
@@ -184,7 +189,11 @@ pub(crate) fn show_settings(ui: &mut egui::Ui, state: &mut AppState) {
         ui.add_space(6.0);
         ui.checkbox(
             &mut state.settings.system_audio_enabled,
-            "Masaüstü sesini yakala (WASAPI)",
+            if cfg!(windows) {
+                "Masaüstü sesini yakala (WASAPI)"
+            } else {
+                "Masaüstü sesini yakala (PulseAudio / PipeWire)"
+            },
         );
         if state.settings.system_audio_enabled {
             ui.horizontal(|ui| {
@@ -194,7 +203,11 @@ pub(crate) fn show_settings(ui: &mut egui::Ui, state: &mut AppState) {
                     0.0..=1.0,
                 ));
             });
-            ui.small("Varsayılan Windows ses çıkışı kayıt akışına eklenir.");
+            ui.small(if cfg!(windows) {
+                "Varsayılan Windows ses çıkışı kayıt akışına eklenir."
+            } else {
+                "Varsayılan ses çıkışının monitor kaynağı kayıt akışına eklenir."
+            });
         }
 
         ui.collapsing("Video filtreleri", |ui| {

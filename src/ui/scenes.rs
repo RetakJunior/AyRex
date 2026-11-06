@@ -99,20 +99,29 @@ pub(crate) fn show_scenes(ui: &mut egui::Ui, state: &mut AppState) {
                     for window in &state.windows {
                         let label = format!("{} — {}", window.app, window.title);
                         if ui.selectable_label(false, label).clicked() {
-                            add_window = Some((window.app.clone(), window.title.clone()));
+                            add_window = Some((
+                                window.app.clone(),
+                                window.title.clone(),
+                                window.id,
+                            ));
                         }
                     }
                 });
-            if let Some((app, title)) = add_window {
+            if let Some((app, title, id)) = add_window {
+                let value = if cfg!(target_os = "linux") {
+                    id.to_string()
+                } else {
+                    title.clone()
+                };
                 if !scene
                     .sources
                     .iter()
-                    .any(|source| source.kind == SceneSourceKind::Window && source.value == title)
+                    .any(|source| source.kind == SceneSourceKind::Window && source.value == value)
                 {
                     scene.sources.push(SceneSource {
                         name: format!("{app} — {title}"),
                         kind: SceneSourceKind::Window,
-                        value: title,
+                        value,
                         visible: true,
                         transform: None,
                     });
@@ -146,7 +155,10 @@ pub(crate) fn show_scenes(ui: &mut egui::Ui, state: &mut AppState) {
                 });
             }
             if state.camera_devices.is_empty() {
+                #[cfg(windows)]
                 ui.small("Kamera bulunamadı (FFmpeg DirectShow)");
+                #[cfg(target_os = "linux")]
+                ui.small("Kamera bulunamadı (/dev/video*)");
             }
             if ui.button("Görsel kaynağı ekle…").clicked() {
                 if let Some(path) = rfd::FileDialog::new()

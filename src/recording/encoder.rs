@@ -36,6 +36,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
         && config.display.dxgi_output_index.is_some()
         && !legacy_window_capture;
     if legacy_window_capture && let Some(title) = &config.window_title {
+        #[cfg(windows)]
         command.args([
             "-f",
             "gdigrab",
@@ -43,6 +44,22 @@ pub(crate) fn build_ffmpeg_command_with_replay(
             &config.fps.to_string(),
             "-i",
             &format!("title={title}"),
+        ]);
+        #[cfg(target_os = "linux")]
+        let window_id = title.parse::<u32>().map_or_else(
+            |_| title.clone(),
+            |id| format!("0x{id:x}"),
+        );
+        #[cfg(target_os = "linux")]
+        command.args([
+            "-f",
+            "x11grab",
+            "-framerate",
+            &config.fps.to_string(),
+            "-window_id",
+            &window_id,
+            "-i",
+            &std::env::var("DISPLAY").unwrap_or_else(|_| ":0.0".to_owned()),
         ]);
     } else if use_dxgi_capture {
         let mut source = format!(
@@ -75,6 +92,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
         let capture_height = (region.height * config.display.height as f32)
             .round()
             .max(2.0) as u32;
+        #[cfg(windows)]
         command.args([
             "-f",
             "gdigrab",
@@ -89,10 +107,33 @@ pub(crate) fn build_ffmpeg_command_with_replay(
             "-i",
             "desktop",
         ]);
+        #[cfg(target_os = "linux")]
+        {
+            let display = std::env::var("DISPLAY").unwrap_or_else(|_| ":0.0".to_owned());
+            let window_id = source.value.parse::<u32>().map_or_else(
+                |_| source.value.clone(),
+                |id| format!("0x{id:x}"),
+            );
+            command.args([
+                "-f",
+                "x11grab",
+                "-framerate",
+                &config.fps.to_string(),
+                "-video_size",
+                &format!("{}x{}", capture_width, capture_height),
+                "-i",
+                &format!("{display}+{offset_x},{offset_y}"),
+            ]);
+        }
     }
 
     let mut next_input = 1;
     let microphone_index = if let Some(device) = &config.audio_device {
+        #[cfg(windows)]
+        let window_id = source.value.parse::<u32>().map_or_else(
+            |_| source.value.clone(),
+            |id| format!("0x{id:x}"),
+        );
         command.args([
             "-thread_queue_size",
             "512",
@@ -101,6 +142,15 @@ pub(crate) fn build_ffmpeg_command_with_replay(
             "-i",
             &format!("audio={device}"),
         ]);
+        #[cfg(target_os = "linux")]
+        command.args([
+            "-thread_queue_size",
+            "512",
+            "-f",
+            "pulse",
+            "-i",
+            device,
+        ]);
         let index = next_input;
         next_input += 1;
         Some(index)
@@ -108,6 +158,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
         None
     };
 
+    #[cfg(windows)]
     let system_audio_index = system_audio_port.map(|port| {
         command.args([
             "-thread_queue_size",
@@ -121,6 +172,26 @@ pub(crate) fn build_ffmpeg_command_with_replay(
             "-i",
             &format!("tcp://127.0.0.1:{port}"),
         ]);
+        let index = next_input;
+        next_input += 1;
+        index
+    });
+    #[cfg(target_os = "linux")]
+    let system_audio_index = config.system_audio_enabled.then(|| {
+        command.args([
+            "-thread_queue_size",
+            "512",
+            "-f",
+            "pulse",
+            "-i",
+            "@DEFAULT_MONITOR@",
+        ]);
+        let index = next_input;
+        next_input += 1;
+        index
+    });
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let system_audio_index = system_audio_port.map(|_| {
         let index = next_input;
         next_input += 1;
         index
@@ -381,6 +452,7 @@ fn append_scene_source_inputs(
     for source in sources {
         let input_index = match source.kind {
             SceneSourceKind::Camera => {
+                #[cfg(windows)]
                 command.args([
                     "-thread_queue_size",
                     "512",
@@ -393,9 +465,23 @@ fn append_scene_source_inputs(
                     "-i",
                     &format!("video={}", source.value),
                 ]);
+                #[cfg(target_os = "linux")]
+                command.args([
+                    "-thread_queue_size",
+                    "512",
+                    "-f",
+                    "v4l2",
+                    "-video_size",
+                    "1280x720",
+                    "-framerate",
+                    &config.fps.to_string(),
+                    "-i",
+                    &source.value,
+                ]);
                 Some(allocate_input_index(next_input))
             }
             SceneSourceKind::Window => {
+                #[cfg(windows)]
                 command.args([
                     "-thread_queue_size",
                     "512",
@@ -406,6 +492,22 @@ fn append_scene_source_inputs(
                     "-i",
                     &format!("title={}", source.value),
                 ]);
+                #[cfg(target_os = "linux")]
+                {
+                    let display = std::env::var("DISPLAY").unwrap_or_else(|_| ":0.0".to_owned());
+                    command.args([
+                        "-thread_queue_size",
+                        "512",
+                        "-f",
+                        "x11grab",
+                        "-framerate",
+                        &config.fps.to_string(),
+                        "-window_id",
+                        &window_id,
+                        "-i",
+                        &display,
+                    ]);
+                }
                 Some(allocate_input_index(next_input))
             }
             SceneSourceKind::Image => {
@@ -478,8 +580,13 @@ fn source_filter(
                 (geometry.width as f32 / (text.chars().count().max(1) as f32 * 0.62)) as u32;
             let font_size = height_font.min(width_font).clamp(10, 160);
             graph.push_str(&format!(
-                ";[{}]drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':text='{}':expansion=none:fontcolor=white:fontsize={}:box=1:boxcolor=black@0.55:boxborderw=12:x={}:y={}[{}]",
+                ";[{}]drawtext={}:text='{}':expansion=none:fontcolor=white:fontsize={}:box=1:boxcolor=black@0.55:boxborderw=12:x={}:y={}[{}]",
                 base,
+                if cfg!(windows) {
+                    "fontfile='C\\:/Windows/Fonts/arial.ttf'"
+                } else {
+                    "font='Sans'"
+                },
                 escape_drawtext_text(text),
                 font_size,
                 geometry.x,
@@ -815,7 +922,10 @@ mod tests {
             .collect::<Vec<_>>()
             .join(" ");
 
+        #[cfg(windows)]
         assert!(args.contains("-offset_x -100"));
+        #[cfg(target_os = "linux")]
+        assert!(args.contains("DISPLAY+-100,0") || args.contains(":0.0+-100,0"));
         assert!(args.contains("-video_size 1366x768"));
         assert!(args.contains("scale=1920:1080"));
         assert!(args.contains("-r 30"));
@@ -839,12 +949,18 @@ mod tests {
             .collect::<Vec<_>>()
             .join(" ");
 
-        assert!(args.contains("-offset_x 242"));
-        assert!(args.contains("-offset_y 77"));
+        #[cfg(windows)]
+        {
+            assert!(args.contains("-offset_x 242"));
+            assert!(args.contains("-offset_y 77"));
+        }
+        #[cfg(target_os = "linux")]
+        assert!(args.contains(":0.0+242,77"));
         assert!(args.contains("-video_size 683x576"));
     }
 
     #[test]
+    #[cfg(windows)]
     fn desktop_duplication_uses_the_mapped_dxgi_output_and_downloads_frames_for_filters() {
         let mut config = test_config(None);
         config.display.dxgi_output_index = Some(2);
@@ -879,13 +995,17 @@ mod tests {
             .collect::<Vec<_>>()
             .join(" ");
 
+        #[cfg(windows)]
         assert!(args.contains("audio=Microphone Device"));
+        #[cfg(target_os = "linux")]
+        assert!(args.contains("-f pulse -i Microphone Device"));
         assert!(args.contains("-map 1:a:0"));
         assert!(args.contains("-c:a aac"));
         assert!(args.contains("volume=0.50"));
     }
 
     #[test]
+    #[cfg(windows)]
     fn system_audio_uses_a_local_float_stream_and_is_written_to_its_own_track() {
         let mut config = test_config(Some("Microphone".to_owned()));
         config.system_audio_enabled = true;
@@ -908,6 +1028,21 @@ mod tests {
         assert!(args.contains("-map [mictrack] -map [systemtrack]"));
         assert!(args.contains("title=Mikrofon"));
         assert!(args.contains("title=Masaüstü"));
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn system_audio_uses_the_default_pulse_monitor_source() {
+        let mut config = test_config(Some("default".to_owned()));
+        config.system_audio_enabled = true;
+        let args = build_ffmpeg_command(&config, Path::new("recordings/mixed.mkv"))
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        assert!(args.contains("-f pulse -i @DEFAULT_MONITOR@"));
+        assert!(args.contains("-map 2:a:0"));
     }
 
     #[test]
@@ -998,7 +1133,10 @@ mod tests {
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect::<Vec<_>>()
             .join(" ");
+        #[cfg(windows)]
         assert!(args.contains("video=USB Camera"));
+        #[cfg(target_os = "linux")]
+        assert!(args.contains("-f v4l2"));
         assert!(args.contains("scale=499:292:force_original_aspect_ratio=decrease[source_0]"));
         assert!(args.contains("overlay=1382:734:eof_action=pass[merged_0]"));
         assert!(args.contains("[merged_0]null[outv]"));
@@ -1023,7 +1161,15 @@ mod tests {
         let mut config = test_config(None);
         config.scene_sources = vec![
             SceneSource::display(),
-            scene_source(SceneSourceKind::Window, "AyRex Window", "AyRex Test Window"),
+            scene_source(
+                SceneSourceKind::Window,
+                "AyRex Window",
+                if cfg!(target_os = "linux") {
+                    "234"
+                } else {
+                    "AyRex Test Window"
+                },
+            ),
             scene_source(SceneSourceKind::Image, "Logo one", "logo one.png"),
             scene_source(SceneSourceKind::Image, "Logo two", "logo two.png"),
             scene_source(SceneSourceKind::Text, "Title", "First title"),
@@ -1035,8 +1181,13 @@ mod tests {
             .collect::<Vec<_>>()
             .join(" ");
 
-        assert!(args.contains("-i desktop"));
-        assert!(args.contains("title=AyRex Test Window"));
+        #[cfg(windows)]
+        {
+            assert!(args.contains("-i desktop"));
+            assert!(args.contains("title=AyRex Test Window"));
+        }
+        #[cfg(target_os = "linux")]
+        assert!(args.contains("-window_id 0xea"));
         assert!(args.contains("-i logo one.png"));
         assert!(args.contains("-i logo two.png"));
         assert_eq!(args.matches("drawtext=").count(), 2);
@@ -1076,6 +1227,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)]
     fn window_capture_uses_the_selected_window_title() {
         let mut config = test_config(None);
         config.window_title = Some("Untitled — AyRex".to_owned());
@@ -1097,7 +1249,10 @@ mod tests {
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect::<Vec<_>>()
             .join(" ");
+        #[cfg(windows)]
         assert!(args.contains("drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf'"));
+        #[cfg(target_os = "linux")]
+        assert!(args.contains("drawtext=font='Sans'"));
         assert!(args.contains("text='Merhaba\\: AyRex\\; % yayında':expansion=none"));
         assert!(args.contains("[merged_0]null[outv]"));
     }

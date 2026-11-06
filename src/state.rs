@@ -129,8 +129,11 @@ impl AppState {
                 Err(error) => notice = Some(error),
             }
         } else {
-            notice =
-                Some("FFmpeg was not found. Install FFmpeg and add ffmpeg.exe to PATH.".to_owned());
+            notice = Some(if cfg!(windows) {
+                "FFmpeg was not found. Install FFmpeg and add ffmpeg.exe to PATH.".to_owned()
+            } else {
+                "FFmpeg was not found. Install FFmpeg and add it to PATH.".to_owned()
+            });
         }
 
         if !encoders.iter().any(|encoder| encoder == &settings.encoder) {
@@ -566,7 +569,14 @@ impl AppState {
     }
 
     pub fn open_output_folder(&mut self) {
-        if let Err(error) = std::process::Command::new("explorer.exe")
+        let file_manager = if cfg!(windows) {
+            "explorer.exe"
+        } else if cfg!(target_os = "macos") {
+            "open"
+        } else {
+            "xdg-open"
+        };
+        if let Err(error) = std::process::Command::new(file_manager)
             .arg(&self.settings.output_dir)
             .spawn()
         {

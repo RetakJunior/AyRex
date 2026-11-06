@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AyRex
+Comment=Screen recording and live streaming
+Exec=ayrex
+Icon=io.github.retakjunior.AyRex
+Categories=AudioVideo;Recorder;
+Terminal=false
+StartupNotify=true

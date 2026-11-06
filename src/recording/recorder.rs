@@ -46,12 +46,15 @@ impl Recorder {
         } else {
             None
         };
+        #[cfg(windows)]
         let (system_audio_capture, system_audio_port) = if config.system_audio_enabled {
             let (capture, port) = SystemAudioCapture::start()?;
             (Some(capture), Some(port))
         } else {
             (None, None)
         };
+        #[cfg(not(windows))]
+        let (system_audio_capture, system_audio_port) = (None, None);
         let mut command = build_ffmpeg_command_with_replay(
             config,
             &output_path,

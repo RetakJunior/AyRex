@@ -8,10 +8,11 @@ Upstream source: https://github.com/HEnquist/wasapi-rs
 
 FFmpeg
 -------
-The portable Windows package includes a separate, statically built FFmpeg
-executable from Gyan.Dev's Windows full build. It includes GPL-licensed
-components including libx264. FFmpeg remains a separate process and is not
-linked into the AyRex executable.
+The portable Windows package includes a separate FFmpeg executable and its
+adjacent runtime libraries from Gyan.Dev's Windows build. The Linux AppImage includes
+FFmpeg from the Ubuntu 22.04 distribution packages and its dependent shared
+libraries. Both include GPL-licensed components including libx264. FFmpeg
+remains a separate process and is not linked into the AyRex executable.
 
 FFmpeg project and source code:
   https://ffmpeg.org/

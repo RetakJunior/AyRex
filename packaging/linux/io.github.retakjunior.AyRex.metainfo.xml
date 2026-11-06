@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.retakjunior.AyRex</id>
+  <name>AyRex</name>
+  <summary>Screen recording and live streaming</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <description>
+    <p>Record an X11 desktop, mix audio, and stream to RTMP, RTMPS, or SRT destinations.</p>
+  </description>
+  <launchable type="desktop-id">io.github.retakjunior.AyRex.desktop</launchable>
+  <url type="homepage">https://github.com/RetakJunior/AyRex</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.2" date="2026-11-07"/>
+  </releases>
+</component>

@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --locked
+      - name: Build AyRex
+        run: cargo build --release --locked
+      - name: Download FFmpeg
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip `
+            -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg
+          $ffmpeg = Get-ChildItem -Path ffmpeg -Filter ffmpeg.exe -Recurse |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ffmpeg) { throw 'FFmpeg executable was not found in the archive.' }
+          "FFMPEG_PATH=$ffmpeg" >> $env:GITHUB_ENV
+      - name: Package Windows
+        shell: pwsh
+        run: |
+          ./scripts/package-windows.ps1 `
+            -FfmpegPath "$env:FFMPEG_PATH" `
+            -PackageName AyRex-Windows-x64
+          Copy-Item target/release/ayrex.exe dist/AyRex.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            dist/AyRex-Windows-x64.zip
+            dist/AyRex.exe
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libclang-dev libxcb1-dev libxrandr-dev \
+            libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev \
+            libxkbcommon-dev libx11-dev libxcursor-dev libxi-dev \
+            libgl1-mesa-dev libasound2-dev ffmpeg
+      - name: Verify FFmpeg support
+        run: |
+          ffmpeg -hide_banner -encoders 2>&1 | grep -q 'libx264'
+          ffmpeg -hide_banner -devices 2>&1 | grep -q 'x11grab'
+      - name: Test
+        run: cargo test --locked
+      - name: Build AyRex
+        run: cargo build --release --locked
+      - name: Build AppImage
+        run: |
+          set -euxo pipefail
+          appdir="$PWD/AppDir"
+          install -Dm755 target/release/ayrex "$appdir/usr/bin/ayrex"
+          install -Dm755 "$(command -v ffmpeg)" "$appdir/usr/bin/ffmpeg"
+          install -Dm644 src/logo/ayrex.png \
+            "$appdir/usr/share/icons/hicolor/512x512/apps/io.github.retakjunior.AyRex.png"
+          install -Dm644 packaging/linux/io.github.retakjunior.AyRex.desktop \
+            "$appdir/usr/share/applications/io.github.retakjunior.AyRex.desktop"
+          install -Dm644 packaging/linux/io.github.retakjunior.AyRex.metainfo.xml \
+            "$appdir/usr/share/metainfo/io.github.retakjunior.AyRex.metainfo.xml"
+          install -Dm644 README.md "$appdir/usr/share/doc/ayrex/README.md"
+          install -Dm644 THIRD_PARTY_NOTICES.txt \
+            "$appdir/usr/share/doc/ayrex/THIRD_PARTY_NOTICES.txt"
+          install -Dm644 licenses/FFmpeg-GPLv3.txt \
+            "$appdir/usr/share/doc/ayrex/FFmpeg-GPLv3.txt"
+          curl -L --fail --retry 3 \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
+            -o linuxdeploy
+          curl -L --fail --retry 3 \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage \
+            -o linuxdeploy-plugin-appimage
+          chmod +x linuxdeploy linuxdeploy-plugin-appimage
+          export LINUXDEPLOY_PLUGIN_APPIMAGE="$PWD/linuxdeploy-plugin-appimage"
+          ./linuxdeploy --appimage-extract-and-run --appdir "$appdir" \
+            --executable "$appdir/usr/bin/ayrex" \
+            --executable "$appdir/usr/bin/ffmpeg" \
+            --desktop-file "$appdir/usr/share/applications/io.github.retakjunior.AyRex.desktop" \
+            --icon-file "$appdir/usr/share/icons/hicolor/512x512/apps/io.github.retakjunior.AyRex.png" \
+            --output appimage
+          mv ./*.AppImage dist-AyRex-Linux-x86_64.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: dist-AyRex-Linux-x86_64.AppImage
+          if-no-files-found: error
+
+  publish:
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release-assets/windows-release/AyRex-Windows-x64.zip
+            release-assets/windows-release/AyRex.exe
+            release-assets/linux-release/dist-AyRex-Linux-x86_64.AppImage

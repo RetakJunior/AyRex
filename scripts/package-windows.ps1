@@ -37,6 +37,8 @@ $bundledFfmpeg = Join-Path $distribution 'ffmpeg.exe'
 if ([IO.Path]::GetFullPath($FfmpegPath) -ne [IO.Path]::GetFullPath($bundledFfmpeg)) {
     Copy-Item -LiteralPath $FfmpegPath -Destination $bundledFfmpeg -Force
 }
+Get-ChildItem -LiteralPath (Split-Path -Parent $FfmpegPath) -Filter '*.dll' -File |
+    Copy-Item -Destination $distribution -Force
 Copy-Item -LiteralPath (Join-Path $repository 'README.md') -Destination $distribution -Force
 Copy-Item -LiteralPath (Join-Path $repository 'THIRD_PARTY_NOTICES.txt') -Destination $distribution -Force
 Copy-Item -LiteralPath (Join-Path $repository 'licenses\FFmpeg-GPLv3.txt') -Destination $distribution -Force
