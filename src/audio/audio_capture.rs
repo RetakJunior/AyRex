@@ -1,6 +1,14 @@
 use std::{path::Path, process::Command};
 
 pub fn discover_audio_devices(ffmpeg: &Path) -> Result<Vec<String>, String> {
+    discover_devices(ffmpeg).map(|(audio, _)| audio)
+}
+
+pub fn discover_video_devices(ffmpeg: &Path) -> Result<Vec<String>, String> {
+    discover_devices(ffmpeg).map(|(_, video)| video)
+}
+
+fn discover_devices(ffmpeg: &Path) -> Result<(Vec<String>, Vec<String>), String> {
     let output = Command::new(ffmpeg)
         .args([
             "-hide_banner",
@@ -12,10 +20,12 @@ pub fn discover_audio_devices(ffmpeg: &Path) -> Result<Vec<String>, String> {
             "dummy",
         ])
         .output()
-        .map_err(|error| format!("Could not enumerate audio devices: {error}"))?;
-    Ok(parse_audio_devices(&String::from_utf8_lossy(
-        &output.stderr,
-    )))
+        .map_err(|error| format!("Could not enumerate audio/video devices: {error}"))?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Ok((
+        parse_devices(&stderr, "(audio)"),
+        parse_devices(&stderr, "(video)"),
+    ))
 }
 
 #[cfg(test)]
@@ -32,9 +42,9 @@ mod tests {
     }
 }
 
-fn parse_audio_devices(stderr: &str) -> Vec<String> {
+fn parse_devices(stderr: &str, kind: &str) -> Vec<String> {
     let mut devices = Vec::new();
-    for line in stderr.lines().filter(|line| line.contains("(audio)")) {
+    for line in stderr.lines().filter(|line| line.contains(kind)) {
         let Some((_, name)) = line.split_once("] ") else {
             continue;
         };
@@ -49,4 +59,9 @@ fn parse_audio_devices(stderr: &str) -> Vec<String> {
         }
     }
     devices
+}
+
+#[cfg(test)]
+fn parse_audio_devices(stderr: &str) -> Vec<String> {
+    parse_devices(stderr, "(audio)")
 }

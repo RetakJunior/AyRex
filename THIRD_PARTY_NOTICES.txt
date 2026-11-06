@@ -1,5 +1,11 @@
 AyRex third-party software notices
 
+wasapi-rs 0.26.0
+----------------
+AyRex links the Rust WASAPI bindings by Henrik Enquist for Windows system audio
+loopback capture. The license is included in wasapi-MIT.txt.
+Upstream source: https://github.com/HEnquist/wasapi-rs
+
 FFmpeg
 -------
 The portable Windows package includes a separate, statically built FFmpeg

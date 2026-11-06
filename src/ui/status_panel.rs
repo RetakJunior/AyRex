@@ -6,16 +6,23 @@ use crate::{
 };
 
 pub(crate) fn show_status(ui: &mut egui::Ui, state: &mut AppState) {
-    ui.heading("Current recording");
-    ui.label(format!("Status: {}", state.recording_status()));
+    ui.heading("Performans ve Durum");
     ui.label(format!(
-        "Duration: {}",
+        "Durum: {}",
+        match state.recording_status() {
+            "Recording" => "Kayıt alınıyor",
+            "Starting" => "Başlatılıyor",
+            _ => "Hazır",
+        }
+    ));
+    ui.label(format!(
+        "Süre: {}",
         format_duration(state.recording_duration())
     ));
     let (width, height) = state.settings.resolution();
-    ui.label(format!("Resolution: {width}x{height}"));
+    ui.label(format!("Çözünürlük: {width}x{height}"));
     ui.label(format!(
-        "FPS: {}",
+        "Kare/sn: {}",
         state
             .current_fps()
             .map(|fps| format!("{fps:.1}"))
@@ -26,12 +33,32 @@ pub(crate) fn show_status(ui: &mut egui::Ui, state: &mut AppState) {
             })
     ));
     ui.label(format!(
-        "File size: {}",
+        "Dosya boyutu: {}",
         format_bytes(state.recording_size())
     ));
-    ui.label(format!("Encoder: {}", state.encoder_display_name()));
+    ui.label(format!("Kodlayıcı: {}", state.encoder_display_name()));
     ui.label(format!(
-        "Dropped frames: {}",
+        "CPU: {}",
+        state
+            .performance
+            .cpu_percent
+            .map(|value| format!("{value:.0}%"))
+            .unwrap_or_else(|| "Ölçülüyor".to_owned())
+    ));
+    ui.label(format!(
+        "RAM: {}",
+        state
+            .performance
+            .ram_percent
+            .map(|value| format!(
+                "{value:.0}% ({} / {})",
+                crate::recording::format_bytes(state.performance.ram_used.unwrap_or_default()),
+                crate::recording::format_bytes(state.performance.ram_total.unwrap_or_default())
+            ))
+            .unwrap_or_else(|| "Ölçülemiyor".to_owned())
+    ));
+    ui.label(format!(
+        "Atlanan kare: {}",
         state
             .dropped_frames()
             .map(|count| count.to_string())
@@ -43,13 +70,13 @@ pub(crate) fn show_status(ui: &mut egui::Ui, state: &mut AppState) {
     }
     if let Some(summary) = &state.last_summary {
         ui.label(format!(
-            "Saved {} frames in {}",
+            "{} kare {} içinde kaydedildi",
             summary.frames,
             format_duration(summary.elapsed)
         ));
     }
-    ui.label(format!("Audio input: {}", state.audio_status()));
-    if ui.button("Open recording folder").clicked() {
+    ui.label(format!("Ses girişi: {}", state.audio_status()));
+    if ui.button("Kayıt klasörünü aç").clicked() {
         state.open_output_folder();
     }
 }
