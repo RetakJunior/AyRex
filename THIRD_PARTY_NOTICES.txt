@@ -1,0 +1,25 @@
+AyRex third-party software notices
+
+FFmpeg
+-------
+The portable Windows package includes a separate, statically built FFmpeg
+executable from Gyan.Dev's Windows full build. It includes GPL-licensed
+components including libx264. FFmpeg remains a separate process and is not
+linked into the AyRex executable.
+
+FFmpeg project and source code:
+  https://ffmpeg.org/
+  https://ffmpeg.org/download.html
+Windows build provider and build information:
+  https://www.gyan.dev/ffmpeg/builds/
+FFmpeg licensing:
+  https://ffmpeg.org/legal.html
+GPL version 3:
+  https://www.gnu.org/licenses/gpl-3.0.html
+
+The package also contains the GPLv3 license text and the exact FFmpeg version
+string used to build it. The FFmpeg executable and its components are
+distributed under their respective upstream licenses. Corresponding sources
+and build information are available from the linked FFmpeg and build-provider
+pages. AyRex's own source code and logo are maintained separately in the AyRex
+repository.
