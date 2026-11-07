@@ -4,6 +4,7 @@
   <name>AyRex</name>
   <summary>Screen recording and live streaming</summary>
   <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
   <description>
     <p>Record an X11 desktop, mix audio, and stream to RTMP, RTMPS, or SRT destinations.</p>
   </description>

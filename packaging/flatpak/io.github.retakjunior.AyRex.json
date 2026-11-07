@@ -1,0 +1,117 @@
+{
+  "app-id": "io.github.retakjunior.AyRex",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "24.08",
+  "sdk": "org.freedesktop.Sdk",
+  "sdk-extensions": [
+    "org.freedesktop.Sdk.Extension.rust-stable"
+  ],
+  "command": "ayrex",
+  "finish-args": [
+    "--device=all",
+    "--filesystem=xdg-videos:rw",
+    "--share=ipc",
+    "--share=network",
+    "--socket=pulseaudio",
+    "--socket=x11",
+    "--talk-name=org.freedesktop.portal.Desktop"
+  ],
+  "modules": [
+    {
+      "name": "x264",
+      "buildsystem": "autotools",
+      "config-opts": [
+        "--disable-cli",
+        "--enable-shared",
+        "--enable-pic"
+      ],
+      "cleanup": [
+        "/include",
+        "/lib/pkgconfig"
+      ],
+      "post-install": [
+        "install -Dm0644 COPYING /app/share/licenses/x264/COPYING"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://code.videolan.org/videolan/x264.git",
+          "commit": "0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee"
+        }
+      ]
+    },
+    {
+      "name": "ffmpeg",
+      "buildsystem": "autotools",
+      "config-opts": [
+        "--enable-gpl",
+        "--enable-gnutls",
+        "--enable-indev=pulse",
+        "--enable-indev=v4l2",
+        "--enable-indev=x11grab",
+        "--enable-libfontconfig",
+        "--enable-libfreetype",
+        "--enable-libpulse",
+        "--enable-libxcb",
+        "--enable-libxcb-shm",
+        "--enable-libxcb-xfixes",
+        "--enable-libx264",
+        "--enable-shared",
+        "--disable-debug",
+        "--disable-doc",
+        "--disable-static",
+        "--disable-ffprobe",
+        "--disable-ffplay"
+      ],
+      "cleanup": [
+        "/include",
+        "/lib/pkgconfig",
+        "/share/ffmpeg"
+      ],
+      "post-install": [
+        "install -Dm0644 COPYING.GPLv3 /app/share/licenses/ffmpeg/COPYING.GPLv3"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/FFmpeg/FFmpeg.git",
+          "tag": "n7.1.1",
+          "commit": "db69d06eeeab4f46da15030a80d539efb4503ca8"
+        }
+      ]
+    },
+    {
+      "name": "ayrex",
+      "buildsystem": "simple",
+      "build-options": {
+        "append-path": "/usr/lib/sdk/rust-stable/bin",
+        "env": {
+          "CARGO_HOME": "/run/build/ayrex/cargo",
+          "CARGO_NET_OFFLINE": "true"
+        }
+      },
+      "build-commands": [
+        "cargo --offline build --locked --release",
+        "install -Dm0755 target/release/ayrex /app/bin/ayrex",
+        "install -Dm0644 LICENSE /app/share/licenses/io.github.retakjunior.AyRex/LICENSE",
+        "install -Dm0644 packaging/linux/io.github.retakjunior.AyRex.desktop /app/share/applications/io.github.retakjunior.AyRex.desktop",
+        "install -Dm0644 packaging/linux/io.github.retakjunior.AyRex.metainfo.xml /app/share/metainfo/io.github.retakjunior.AyRex.metainfo.xml",
+        "install -Dm0644 src/logo/ayrex.png /app/share/icons/hicolor/512x512/apps/io.github.retakjunior.AyRex.png",
+        "install -Dm0644 THIRD_PARTY_NOTICES.txt /app/share/doc/ayrex/THIRD_PARTY_NOTICES.txt"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/RetakJunior/AyRex.git",
+          "commit": "df44f0b751bbf967eca87322f67fd1cd58594f06"
+        },
+        "cargo-sources.json",
+        {
+          "type": "inline",
+          "contents": "MIT License\n\nCopyright (c) 2026 RetakJunior\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+          "dest-filename": "LICENSE"
+        }
+      ]
+    }
+  ]
+}

@@ -110,10 +110,6 @@ pub(crate) fn build_ffmpeg_command_with_replay(
         #[cfg(target_os = "linux")]
         {
             let display = std::env::var("DISPLAY").unwrap_or_else(|_| ":0.0".to_owned());
-            let window_id = source.value.parse::<u32>().map_or_else(
-                |_| source.value.clone(),
-                |id| format!("0x{id:x}"),
-            );
             command.args([
                 "-f",
                 "x11grab",
@@ -129,11 +125,6 @@ pub(crate) fn build_ffmpeg_command_with_replay(
 
     let mut next_input = 1;
     let microphone_index = if let Some(device) = &config.audio_device {
-        #[cfg(windows)]
-        let window_id = source.value.parse::<u32>().map_or_else(
-            |_| source.value.clone(),
-            |id| format!("0x{id:x}"),
-        );
         command.args([
             "-thread_queue_size",
             "512",
@@ -495,6 +486,10 @@ fn append_scene_source_inputs(
                 #[cfg(target_os = "linux")]
                 {
                     let display = std::env::var("DISPLAY").unwrap_or_else(|_| ":0.0".to_owned());
+                    let window_id = source.value.parse::<u32>().map_or_else(
+                        |_| source.value.clone(),
+                        |id| format!("0x{id:x}"),
+                    );
                     command.args([
                         "-thread_queue_size",
                         "512",

@@ -79,6 +79,7 @@ jobs:
           install -Dm644 packaging/linux/io.github.retakjunior.AyRex.metainfo.xml \
             "$appdir/usr/share/metainfo/io.github.retakjunior.AyRex.metainfo.xml"
           install -Dm644 README.md "$appdir/usr/share/doc/ayrex/README.md"
+          install -Dm644 LICENSE "$appdir/usr/share/licenses/ayrex/LICENSE"
           install -Dm644 THIRD_PARTY_NOTICES.txt \
             "$appdir/usr/share/doc/ayrex/THIRD_PARTY_NOTICES.txt"
           install -Dm644 licenses/FFmpeg-GPLv3.txt \
@@ -97,11 +98,11 @@ jobs:
             --desktop-file "$appdir/usr/share/applications/io.github.retakjunior.AyRex.desktop" \
             --icon-file "$appdir/usr/share/icons/hicolor/512x512/apps/io.github.retakjunior.AyRex.png" \
             --output appimage
-          mv ./*.AppImage dist-AyRex-Linux-x86_64.AppImage
+          mv ./*.AppImage AyRex-Linux-x86_64.AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: linux-release
-          path: dist-AyRex-Linux-x86_64.AppImage
+          path: AyRex-Linux-x86_64.AppImage
           if-no-files-found: error
 
   publish:
