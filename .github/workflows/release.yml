@@ -22,9 +22,11 @@ jobs:
       - name: Download FFmpeg
         shell: pwsh
         run: |
-          Invoke-WebRequest `
-            -Uri https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip `
-            -OutFile ffmpeg.zip
+          curl.exe --fail --location --retry 5 --retry-all-errors --retry-delay 5 `
+            --connect-timeout 30 --max-time 1200 `
+            https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip `
+            --output ffmpeg.zip
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg download failed after retries.' }
           Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg
           $ffmpeg = Get-ChildItem -Path ffmpeg -Filter ffmpeg.exe -Recurse |
             Select-Object -First 1 -ExpandProperty FullName
