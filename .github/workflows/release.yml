@@ -118,4 +118,4 @@ jobs:
           files: |
             release-assets/windows-release/AyRex-Windows-x64.zip
             release-assets/windows-release/AyRex.exe
-            release-assets/linux-release/dist-AyRex-Linux-x86_64.AppImage
+            release-assets/linux-release/AyRex-Linux-x86_64.AppImage
