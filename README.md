@@ -44,13 +44,11 @@ Twitch RTMP adres biçimi: https://dev.twitch.tv/docs/video-broadcast/
 
 ## Çalıştırma
 
-Windows x64 taşınabilir sürüm için Releases bölümündeki `AyRex-Windows-x64.zip` dosyasını çıkarın; `AyRex.exe`, `ffmpeg.exe` ve FFmpeg DLL'leri aynı klasörde kalmalıdır. Ayar ve kayıtlar kullanıcı profilinde tutulur.
+Windows x64 sürümü için Releases bölümündeki `AyRex.exe` dosyasını çalıştırın. Kayıt özelliği için FFmpeg ayrıca kurulmalı ve `ffmpeg.exe` PATH'te bulunmalıdır. Ayar ve kayıtlar kullanıcı profilinde tutulur.
 
-Linux x86_64 için Releases bölümündeki `AyRex-Linux-x86_64.AppImage` dosyasını indirin, çalıştırılabilir yapın (`chmod +x AyRex-Linux-x86_64.AppImage`) ve çalıştırın. Paket X11/XWayland, FFmpeg'in PulseAudio giriş desteği ve V4L2 kamera cihazları olan sistemler içindir. Wayland-only masaüstünde ekran kaydı bu sürümde desteklenmez; X11 oturumu gerekir. AppImage uygulama ve FFmpeg'i taşır, ancak Linux grafik/ses sunucularını ve ekran/kamera donanım sürücülerini sistemden kullanır; tüm dağıtımlarda ve donanımlarda çalışma garantisi verilemez. Flathub yayını ayrı paketleme ve mağaza incelemesi gerektirir.
+Linux x86_64 için Releases bölümündeki `AyRex-Linux-x86_64.AppImage` dosyasını indirin, çalıştırılabilir yapın (`chmod +x AyRex-Linux-x86_64.AppImage`) ve çalıştırın. Paket X11/XWayland, FFmpeg'in PulseAudio giriş desteği ve V4L2 kamera cihazları olan sistemler içindir. Wayland-only masaüstünde ekran kaydı bu sürümde desteklenmez; X11 oturumu gerekir. AppImage uygulama ve FFmpeg'i taşır, ancak Linux grafik/ses sunucularını ve ekran/kamera donanım sürücülerini sistemden kullanır; tüm dağıtımlarda ve donanımlarda çalışma garantisi verilemez.
 
-Gizlilik için ekran önizlemesi uygulama açıldığında kapalıdır. Ekran görüntülerini yalnızca önizlemeyi kendiniz başlattığınızda alır; önizlemeyi istediğiniz zaman durdurabilirsiniz.
-
-Flathub manifesti ve kilitlenmiş Cargo kaynakları `packaging/flatpak/` altındadır. Yerel deneme için `flatpak-builder --force-clean build-dir packaging/flatpak/io.github.retakjunior.AyRex.json` çalıştırın; Flathub'a gönderim ayrıca yapılmalıdır.
+Gizlilik için uygulama açıldığında ekran yakalama yapılmaz. “Tek kare al” yalnızca bir ekran görüntüsü alır; devamlı ekran yakalama sadece kayıt başlatıldığında gerçekleşir.
 
 Linux geliştirme bağımlılıkları (Debian/Ubuntu):
 

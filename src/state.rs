@@ -306,22 +306,21 @@ impl AppState {
 
     pub fn select_scene(&mut self, index: usize) {
         if let Some(scene) = self.settings.scenes.get(index).cloned() {
+            self.stop_preview();
             self.settings.active_scene = index;
             self.selected_display_id = Some(scene.display_id);
-            self.preview_texture = None;
-            if let Some(preview) = &self.preview {
-                preview.select_monitor(scene.display_id);
-            }
         }
     }
 
     pub fn start_preview(&mut self) {
+        if self.recorder.is_some() || self.preview.is_some() {
+            return;
+        }
         let Some(display_id) = self.selected_display_id else {
             return;
         };
-        if self.preview.is_none() {
-            self.preview = Some(PreviewCapture::start(display_id));
-        }
+        self.preview_texture = None;
+        self.preview = Some(PreviewCapture::start(display_id));
     }
 
     pub fn stop_preview(&mut self) {
@@ -523,10 +522,7 @@ impl AppState {
                 }
             }
         }
-        self.preview_texture = None;
-        if let Some(preview) = &self.preview {
-            preview.select_monitor(id);
-        }
+        self.stop_preview();
     }
 
     pub fn choose_output_dir(&mut self) {

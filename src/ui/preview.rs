@@ -4,10 +4,10 @@ use crate::config::{SceneSourceKind, SourceTransform};
 use crate::state::AppState;
 
 pub(crate) fn update_preview(state: &mut AppState, ctx: &egui::Context) {
-    let Some(preview) = &state.preview else {
+    let Some(capture_result) = state.preview.as_ref().map(|preview| preview.try_receive()) else {
         return;
     };
-    match preview.try_receive() {
+    match capture_result {
         Ok(Some(frame)) => {
             let image =
                 ColorImage::from_rgba_unmultiplied([frame.width, frame.height], &frame.pixels);
@@ -17,53 +17,65 @@ pub(crate) fn update_preview(state: &mut AppState, ctx: &egui::Context) {
                 state.preview_texture =
                     Some(ctx.load_texture("screen-preview", image, TextureOptions::LINEAR));
             }
+            state.preview = None;
         }
         Ok(None) => {}
-        Err(error) => state.notice = Some(format!("Screen preview failed: {error}")),
+        Err(error) => {
+            state.preview = None;
+            state.notice = Some(format!("Screen preview failed: {error}"));
+        }
     }
 }
 
 pub(crate) fn show_preview(ui: &mut egui::Ui, state: &mut AppState) {
     ui.horizontal(|ui| {
-        ui.heading("Canlı Önizleme");
-        let preview_active = state.preview.is_some();
-        let can_toggle_preview = preview_active || state.selected_display_id.is_some();
+        ui.heading("Ekran Önizlemesi");
+        let capture_pending = state.preview.is_some();
+        let snapshot_ready = state.preview_texture.is_some();
+        let can_toggle_preview = state.recorder.is_none()
+            && (capture_pending || snapshot_ready || state.selected_display_id.is_some());
         if ui
             .add_enabled(
                 can_toggle_preview,
-                egui::Button::new(if preview_active {
-                    "Önizlemeyi durdur"
+                egui::Button::new(if capture_pending {
+                    "İptal"
+                } else if snapshot_ready {
+                    "Görüntüyü temizle"
                 } else {
-                    "Önizlemeyi başlat"
+                    "Tek kare al"
                 }),
             )
             .clicked()
         {
-            if preview_active {
+            if capture_pending || snapshot_ready {
                 state.stop_preview();
             } else {
                 state.start_preview();
             }
         }
-        ui.add_enabled_ui(state.recorder.is_none() && state.preview.is_some(), |ui| {
-            if ui
-                .selectable_label(state.capture_region_selecting, "Kayıt alanı seç")
-                .clicked()
-            {
-                state.capture_region_selecting = !state.capture_region_selecting;
-                state.capture_region_drag_start = None;
-            }
-            let has_region = state
-                .settings
-                .scenes
-                .get(state.settings.active_scene)
-                .is_some_and(|scene| scene.capture_region.is_some());
-            if has_region && ui.small_button("Alanı sıfırla").clicked() {
-                if let Some(scene) = state.settings.scenes.get_mut(state.settings.active_scene) {
-                    scene.capture_region = None;
+        ui.add_enabled_ui(
+            state.recorder.is_none() && state.preview_texture.is_some(),
+            |ui| {
+                if ui
+                    .selectable_label(state.capture_region_selecting, "Kayıt alanı seç")
+                    .clicked()
+                {
+                    state.capture_region_selecting = !state.capture_region_selecting;
+                    state.capture_region_drag_start = None;
                 }
-            }
-        });
+                let has_region = state
+                    .settings
+                    .scenes
+                    .get(state.settings.active_scene)
+                    .is_some_and(|scene| scene.capture_region.is_some());
+                if has_region && ui.small_button("Alanı sıfırla").clicked() {
+                    if let Some(scene) = state.settings.scenes.get_mut(state.settings.active_scene)
+                    {
+                        scene.capture_region = None;
+                    }
+                }
+            },
+        );
     });
     if state.capture_region_selecting {
         ui.small("Önizlemede sürükleyerek kayıt alanını seç.");
@@ -291,9 +303,9 @@ pub(crate) fn show_preview(ui: &mut egui::Ui, state: &mut AppState) {
             canvas.center(),
             egui::Align2::CENTER_CENTER,
             if state.preview.is_some() {
-                "Ekran yakalama bekleniyor..."
+                "Tek kare alınıyor..."
             } else {
-                "Önizleme kapalı. Ekran görüntüsünü görmek için 'Önizlemeyi başlat' düğmesine bas."
+                "Önizleme kapalı. Ekranı bir kez görmek için 'Tek kare al' düğmesine bas."
             },
             egui::FontId::proportional(16.0),
             egui::Color32::from_gray(155),

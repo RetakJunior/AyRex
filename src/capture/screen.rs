@@ -1,11 +1,6 @@
 use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        mpsc::{self, Receiver, SyncSender, TrySendError},
-    },
+    sync::mpsc::{self, Receiver, SyncSender},
     thread,
-    time::Duration,
 };
 
 use xcap::{Monitor, Window};
@@ -125,115 +120,46 @@ enum PreviewMessage {
 }
 
 pub struct PreviewCapture {
-    selected_id: Arc<AtomicU32>,
-    selected_window: Arc<AtomicBool>,
-    running: Arc<AtomicBool>,
     receiver: Receiver<PreviewMessage>,
 }
 
 impl PreviewCapture {
     pub fn start(monitor_id: u32) -> Self {
-        let selected_id = Arc::new(AtomicU32::new(monitor_id));
-        let selected_window = Arc::new(AtomicBool::new(false));
-        let running = Arc::new(AtomicBool::new(true));
         let (sender, receiver) = mpsc::sync_channel(1);
-        thread::spawn({
-            let selected_id = Arc::clone(&selected_id);
-            let selected_window = Arc::clone(&selected_window);
-            let running = Arc::clone(&running);
-            move || preview_loop(selected_id, selected_window, running, sender)
-        });
-        Self {
-            selected_id,
-            selected_window,
-            running,
-            receiver,
-        }
-    }
-
-    pub fn select_monitor(&self, monitor_id: u32) {
-        self.selected_window.store(false, Ordering::Relaxed);
-        self.selected_id.store(monitor_id, Ordering::Relaxed);
-    }
-
-    pub fn select_window(&self, window_id: u32) {
-        self.selected_id.store(window_id, Ordering::Relaxed);
-        self.selected_window.store(true, Ordering::Relaxed);
+        thread::spawn(move || capture_once(monitor_id, sender));
+        Self { receiver }
     }
 
     pub fn try_receive(&self) -> Result<Option<PreviewFrame>, String> {
-        let mut latest = None;
-        while let Ok(message) = self.receiver.try_recv() {
-            match message {
-                PreviewMessage::Frame(frame) => latest = Some(frame),
-                PreviewMessage::Error(error) => return Err(error),
+        match self.receiver.try_recv() {
+            Ok(PreviewMessage::Frame(frame)) => Ok(Some(frame)),
+            Ok(PreviewMessage::Error(error)) => Err(error),
+            Err(mpsc::TryRecvError::Empty) => Ok(None),
+            Err(mpsc::TryRecvError::Disconnected) => {
+                Err("Ekran yakalama işlemi beklenmedik biçimde durdu.".to_owned())
             }
         }
-        Ok(latest)
     }
 }
 
-impl Drop for PreviewCapture {
-    fn drop(&mut self) {
-        self.running.store(false, Ordering::Relaxed);
-    }
-}
-
-fn preview_loop(
-    selected_id: Arc<AtomicU32>,
-    selected_window: Arc<AtomicBool>,
-    running: Arc<AtomicBool>,
-    sender: SyncSender<PreviewMessage>,
-) {
-    let mut last_error = String::new();
-    while running.load(Ordering::Relaxed) {
-        let id = selected_id.load(Ordering::Relaxed);
-        let capture_result = if selected_window.load(Ordering::Relaxed) {
-            Window::all()
-                .map_err(|error| error.to_string())
-                .and_then(|windows| {
-                    windows
-                        .into_iter()
-                        .find(|window| window.id().ok() == Some(id))
-                        .ok_or_else(|| "Seçili pencere artık bulunamadı.".to_owned())
-                        .and_then(|window| {
-                            window.capture_image().map_err(|error| error.to_string())
-                        })
-                })
-        } else {
-            Monitor::all()
-                .map_err(|error| error.to_string())
-                .and_then(|monitors| {
-                    monitors
-                        .into_iter()
-                        .find(|monitor| monitor.id().ok() == Some(id))
-                        .ok_or_else(|| "Seçili ekran artık bulunamadı.".to_owned())
-                        .and_then(|monitor| {
-                            monitor.capture_image().map_err(|error| error.to_string())
-                        })
-                })
-        }
+fn capture_once(monitor_id: u32, sender: SyncSender<PreviewMessage>) {
+    let capture_result = Monitor::all()
+        .map_err(|error| error.to_string())
+        .and_then(|monitors| {
+            monitors
+                .into_iter()
+                .find(|monitor| monitor.id().ok() == Some(monitor_id))
+                .ok_or_else(|| "Seçili ekran artık bulunamadı.".to_owned())
+                .and_then(|monitor| monitor.capture_image().map_err(|error| error.to_string()))
+        })
         .map(|image| PreviewFrame {
             width: image.width() as usize,
             height: image.height() as usize,
             pixels: image.into_raw(),
         });
-
-        match capture_result {
-            Ok(frame) => {
-                last_error.clear();
-                if let Err(TrySendError::Disconnected(_)) =
-                    sender.try_send(PreviewMessage::Frame(frame))
-                {
-                    break;
-                }
-            }
-            Err(error) if error != last_error => {
-                last_error = error.clone();
-                let _ = sender.try_send(PreviewMessage::Error(error));
-            }
-            Err(_) => {}
-        }
-        thread::sleep(Duration::from_millis(150));
-    }
+    let message = match capture_result {
+        Ok(frame) => PreviewMessage::Frame(frame),
+        Err(error) => PreviewMessage::Error(error),
+    };
+    let _ = sender.send(message);
 }

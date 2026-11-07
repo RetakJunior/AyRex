@@ -483,11 +483,7 @@ pub fn window_icon() -> Result<eframe::egui::IconData, image::ImageError> {
 }
 
 pub fn default_output_dir() -> PathBuf {
-    let home_variable = if cfg!(windows) {
-        "USERPROFILE"
-    } else {
-        "HOME"
-    };
+    let home_variable = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
     std::env::var_os(home_variable)
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir)

@@ -46,10 +46,9 @@ pub(crate) fn build_ffmpeg_command_with_replay(
             &format!("title={title}"),
         ]);
         #[cfg(target_os = "linux")]
-        let window_id = title.parse::<u32>().map_or_else(
-            |_| title.clone(),
-            |id| format!("0x{id:x}"),
-        );
+        let window_id = title
+            .parse::<u32>()
+            .map_or_else(|_| title.clone(), |id| format!("0x{id:x}"));
         #[cfg(target_os = "linux")]
         command.args([
             "-f",
@@ -134,14 +133,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
             &format!("audio={device}"),
         ]);
         #[cfg(target_os = "linux")]
-        command.args([
-            "-thread_queue_size",
-            "512",
-            "-f",
-            "pulse",
-            "-i",
-            device,
-        ]);
+        command.args(["-thread_queue_size", "512", "-f", "pulse", "-i", device]);
         let index = next_input;
         next_input += 1;
         Some(index)
@@ -294,14 +286,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
         return command;
     }
 
-    command.args([
-        "-r",
-        &config.fps.to_string(),
-        "-fps_mode",
-        "cfr",
-        "-c:v",
-        &config.encoder,
-    ]);
+    command.args(["-r", &config.fps.to_string(), "-c:v", &config.encoder]);
 
     match config.encoder.as_str() {
         "libx264" => {
@@ -486,10 +471,10 @@ fn append_scene_source_inputs(
                 #[cfg(target_os = "linux")]
                 {
                     let display = std::env::var("DISPLAY").unwrap_or_else(|_| ":0.0".to_owned());
-                    let window_id = source.value.parse::<u32>().map_or_else(
-                        |_| source.value.clone(),
-                        |id| format!("0x{id:x}"),
-                    );
+                    let window_id = source
+                        .value
+                        .parse::<u32>()
+                        .map_or_else(|_| source.value.clone(), |id| format!("0x{id:x}"));
                     command.args([
                         "-thread_queue_size",
                         "512",
@@ -711,14 +696,7 @@ fn audio_mix_filter(
 }
 
 fn append_video_encoder(command: &mut Command, config: &RecordingConfig, replay: bool) {
-    command.args([
-        "-r",
-        &config.fps.to_string(),
-        "-fps_mode",
-        "cfr",
-        "-c:v",
-        &config.encoder,
-    ]);
+    command.args(["-r", &config.fps.to_string(), "-c:v", &config.encoder]);
     append_encoder_preset(command, &config.encoder);
     let bitrate = format!("{}k", config.bitrate_kbps);
     let buffer_size = format!("{}k", config.bitrate_kbps.saturating_mul(2));
@@ -924,6 +902,7 @@ mod tests {
         assert!(args.contains("-video_size 1366x768"));
         assert!(args.contains("scale=1920:1080"));
         assert!(args.contains("-r 30"));
+        assert!(!args.contains("-fps_mode"));
         assert!(args.contains("-b:v 6000k"));
         assert!(args.contains("-f mp4"));
     }
@@ -1105,6 +1084,7 @@ mod tests {
         assert!(args.contains("-profile:v main"));
         assert!(args.contains("-tune zerolatency"));
         assert!(args.contains("-g 60"));
+        assert!(!args.contains("-fps_mode"));
     }
 
     #[test]

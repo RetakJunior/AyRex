@@ -99,11 +99,8 @@ pub(crate) fn show_scenes(ui: &mut egui::Ui, state: &mut AppState) {
                     for window in &state.windows {
                         let label = format!("{} — {}", window.app, window.title);
                         if ui.selectable_label(false, label).clicked() {
-                            add_window = Some((
-                                window.app.clone(),
-                                window.title.clone(),
-                                window.id,
-                            ));
+                            add_window =
+                                Some((window.app.clone(), window.title.clone(), window.id));
                         }
                     }
                 });
