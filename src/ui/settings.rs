@@ -40,20 +40,22 @@ pub(crate) fn show_settings(ui: &mut egui::Ui, state: &mut AppState) {
     ui.add_space(8.0);
     ui.add_enabled_ui(state.recorder.is_none(), |ui| {
         #[cfg(windows)]
-        let dxgi_available = state
-            .selected_display()
-            .is_some_and(|display| display.dxgi_output_index.is_some());
-        #[cfg(windows)]
-        ui.add_enabled_ui(dxgi_available, |ui| {
-            ui.checkbox(
-                &mut state.settings.use_desktop_duplication,
-                "Ekranı DXGI Desktop Duplication ile yakala",
-            );
-        });
-        if !dxgi_available {
-            #[cfg(windows)]
-            ui.small("Seçilen ekran DXGI ile eşleşmedi; GDI yakalama kullanılır.");
-            #[cfg(target_os = "linux")]
+        {
+            let dxgi_available = state
+                .selected_display()
+                .is_some_and(|display| display.dxgi_output_index.is_some());
+            ui.add_enabled_ui(dxgi_available, |ui| {
+                ui.checkbox(
+                    &mut state.settings.use_desktop_duplication,
+                    "Ekranı DXGI Desktop Duplication ile yakala",
+                );
+            });
+            if !dxgi_available {
+                ui.small("Seçilen ekran DXGI ile eşleşmedi; GDI yakalama kullanılır.");
+            }
+        }
+        #[cfg(target_os = "linux")]
+        {
             ui.small("Linux ekran yakalama için X11 oturumu gerekir; Wayland desteklenmiyor.");
         }
 
