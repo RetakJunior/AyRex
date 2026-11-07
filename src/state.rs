@@ -157,7 +157,6 @@ impl AppState {
         {
             settings.camera_device = None;
         }
-        let preview = selected_display_id.map(PreviewCapture::start);
         Self {
             displays,
             selected_display_id,
@@ -170,7 +169,9 @@ impl AppState {
             stream_key,
             custom_stream_url,
             recorder: None,
-            preview,
+            // Screen preview is opt-in. Starting it here captured the selected
+            // monitor continuously as soon as the app opened.
+            preview: None,
             preview_texture: None,
             notice,
             last_summary: None,
@@ -307,10 +308,27 @@ impl AppState {
         if let Some(scene) = self.settings.scenes.get(index).cloned() {
             self.settings.active_scene = index;
             self.selected_display_id = Some(scene.display_id);
+            self.preview_texture = None;
             if let Some(preview) = &self.preview {
                 preview.select_monitor(scene.display_id);
             }
         }
+    }
+
+    pub fn start_preview(&mut self) {
+        let Some(display_id) = self.selected_display_id else {
+            return;
+        };
+        if self.preview.is_none() {
+            self.preview = Some(PreviewCapture::start(display_id));
+        }
+    }
+
+    pub fn stop_preview(&mut self) {
+        self.preview = None;
+        self.preview_texture = None;
+        self.capture_region_selecting = false;
+        self.capture_region_drag_start = None;
     }
 
     pub fn select_stream_platform(&mut self, platform: crate::streaming::StreamPlatform) {
@@ -508,8 +526,6 @@ impl AppState {
         self.preview_texture = None;
         if let Some(preview) = &self.preview {
             preview.select_monitor(id);
-        } else {
-            self.preview = Some(PreviewCapture::start(id));
         }
     }
 

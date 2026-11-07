@@ -26,7 +26,26 @@ pub(crate) fn update_preview(state: &mut AppState, ctx: &egui::Context) {
 pub(crate) fn show_preview(ui: &mut egui::Ui, state: &mut AppState) {
     ui.horizontal(|ui| {
         ui.heading("Canlı Önizleme");
-        ui.add_enabled_ui(state.recorder.is_none(), |ui| {
+        let preview_active = state.preview.is_some();
+        let can_toggle_preview = preview_active || state.selected_display_id.is_some();
+        if ui
+            .add_enabled(
+                can_toggle_preview,
+                egui::Button::new(if preview_active {
+                    "Önizlemeyi durdur"
+                } else {
+                    "Önizlemeyi başlat"
+                }),
+            )
+            .clicked()
+        {
+            if preview_active {
+                state.stop_preview();
+            } else {
+                state.start_preview();
+            }
+        }
+        ui.add_enabled_ui(state.recorder.is_none() && state.preview.is_some(), |ui| {
             if ui
                 .selectable_label(state.capture_region_selecting, "Kayıt alanı seç")
                 .clicked()
@@ -271,7 +290,11 @@ pub(crate) fn show_preview(ui: &mut egui::Ui, state: &mut AppState) {
         ui.painter().text(
             canvas.center(),
             egui::Align2::CENTER_CENTER,
-            "Ekran yakalama bekleniyor...",
+            if state.preview.is_some() {
+                "Ekran yakalama bekleniyor..."
+            } else {
+                "Önizleme kapalı. Ekran görüntüsünü görmek için 'Önizlemeyi başlat' düğmesine bas."
+            },
             egui::FontId::proportional(16.0),
             egui::Color32::from_gray(155),
         );

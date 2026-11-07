@@ -1,5 +1,6 @@
 #[derive(Default)]
 pub(super) struct CpuSampler {
+    #[cfg(windows)]
     previous: Option<(u64, u64)>,
 }
 

@@ -64,7 +64,6 @@ jobs:
           ffmpeg -hide_banner -devices 2>&1 | grep -q 'x11grab'
       - name: Test
         run: cargo test --locked
-        continue-on-error: true
       - name: Build AyRex
         run: cargo build --release --locked
       - name: Build AppImage
@@ -120,7 +119,27 @@ jobs:
             org.freedesktop.Sdk//24.08 \
             org.freedesktop.Sdk.Extension.rust-stable//24.08
       - name: Build Flatpak
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
         run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("packaging/flatpak/io.github.retakjunior.AyRex.json")
+          manifest = json.loads(path.read_text())
+          source_pinned = False
+          for module in manifest["modules"]:
+              if module.get("name") == "ayrex":
+                  for source in module["sources"]:
+                      if isinstance(source, dict) and source.get("type") == "git" and source.get("url", "").endswith("/AyRex.git"):
+                          source["commit"] = os.environ["RELEASE_COMMIT"]
+                          source_pinned = True
+          if not source_pinned:
+              raise SystemExit("AyRex git source was not found in the Flatpak manifest.")
+          path.write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
           flatpak-builder --force-clean --disable-rofiles-fuse --repo=repo build-dir \
             packaging/flatpak/io.github.retakjunior.AyRex.json
           flatpak build-bundle \

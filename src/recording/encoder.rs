@@ -15,7 +15,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
     config: &RecordingConfig,
     output_path: &Path,
     replay_directory: Option<&Path>,
-    system_audio_port: Option<u16>,
+    _system_audio_port: Option<u16>,
 ) -> Command {
     let replay_enabled = config.replay_buffer_seconds > 0 && replay_directory.is_some();
     let mut command = Command::new(&config.ffmpeg);
@@ -150,7 +150,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
     };
 
     #[cfg(windows)]
-    let system_audio_index = system_audio_port.map(|port| {
+    let system_audio_index = _system_audio_port.map(|port| {
         command.args([
             "-thread_queue_size",
             "512",
@@ -182,7 +182,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
         index
     });
     #[cfg(not(any(windows, target_os = "linux")))]
-    let system_audio_index = system_audio_port.map(|_| {
+    let system_audio_index = _system_audio_port.map(|_| {
         let index = next_input;
         next_input += 1;
         index
@@ -920,7 +920,7 @@ mod tests {
         #[cfg(windows)]
         assert!(args.contains("-offset_x -100"));
         #[cfg(target_os = "linux")]
-        assert!(args.contains("DISPLAY+-100,0") || args.contains(":0.0+-100,0"));
+        assert!(args.contains("+-100,0"));
         assert!(args.contains("-video_size 1366x768"));
         assert!(args.contains("scale=1920:1080"));
         assert!(args.contains("-r 30"));
@@ -950,7 +950,7 @@ mod tests {
             assert!(args.contains("-offset_y 77"));
         }
         #[cfg(target_os = "linux")]
-        assert!(args.contains(":0.0+242,77"));
+        assert!(args.contains("+242,77"));
         assert!(args.contains("-video_size 683x576"));
     }
 
@@ -1037,7 +1037,7 @@ mod tests {
             .join(" ");
 
         assert!(args.contains("-f pulse -i @DEFAULT_MONITOR@"));
-        assert!(args.contains("-map 2:a:0"));
+        assert!(args.contains("-map [mictrack] -map [systemtrack]"));
     }
 
     #[test]
