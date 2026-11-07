@@ -27,10 +27,7 @@ impl Display {
         let id = monitor.id().map_err(|error| error.to_string())?;
         Ok(Self {
             id,
-            name: monitor
-                .friendly_name()
-                .or_else(|_| monitor.name())
-                .map_err(|error| error.to_string())?,
+            name: monitor.name().map_err(|error| error.to_string())?,
             x: monitor.x().map_err(|error| error.to_string())?,
             y: monitor.y().map_err(|error| error.to_string())?,
             width: monitor.width().map_err(|error| error.to_string())?,
