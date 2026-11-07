@@ -123,7 +123,9 @@ jobs:
         run: |
           flatpak-builder --force-clean --disable-rofiles-fuse --repo=repo build-dir \
             packaging/flatpak/io.github.retakjunior.AyRex.json
-          flatpak build-bundle repo AyRex-Linux-x86_64.flatpak \
+          flatpak build-bundle \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            repo AyRex-Linux-x86_64.flatpak \
             io.github.retakjunior.AyRex stable
       - uses: actions/upload-artifact@v4
         with:
