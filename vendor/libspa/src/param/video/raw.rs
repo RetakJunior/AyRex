@@ -226,27 +226,11 @@ pub struct VideoInfoRaw(spa_sys::spa_video_info_raw);
 
 impl VideoInfoRaw {
     pub fn new() -> Self {
-        Self(spa_sys::spa_video_info_raw {
-            format: VideoFormat::Unknown.as_raw(),
-            flags: 0,
-            modifier: 0,
-            size: Rectangle {
-                width: 0,
-                height: 0,
-            },
-            framerate: Fraction { num: 0, denom: 0 },
-            max_framerate: Fraction { num: 0, denom: 0 },
-            views: 0,
-            interlace_mode: VideoInterlaceMode::Progressive.as_raw(),
-            pixel_aspect_ratio: Fraction { num: 0, denom: 0 },
-            multiview_mode: 0,
-            multiview_flags: 0,
-            chroma_site: 0,
-            color_range: 0,
-            color_matrix: 0,
-            transfer_function: 0,
-            color_primaries: 0,
-        })
+        let mut raw: spa_sys::spa_video_info_raw = unsafe { std::mem::zeroed() };
+        raw.format = VideoFormat::Unknown.as_raw();
+        raw.modifier = 0;
+        raw.interlace_mode = VideoInterlaceMode::Progressive.as_raw();
+        Self(raw)
     }
 
     pub fn set_format(&mut self, format: VideoFormat) {
@@ -258,19 +242,33 @@ impl VideoInfoRaw {
     }
 
     pub fn set_flags(&mut self, flags: VideoFlags) {
-        self.0.flags = flags.bits();
+        #[cfg(spa_video_info_raw_has_flags)]
+        {
+            self.0.flags = flags.bits();
+        }
+        #[cfg(not(spa_video_info_raw_has_flags))]
+        {
+            let _ = flags;
+        }
     }
 
     pub fn flags(self) -> VideoFlags {
-        VideoFlags::from_bits_retain(self.0.flags)
+        #[cfg(spa_video_info_raw_has_flags)]
+        {
+            VideoFlags::from_bits_retain(self.0.flags)
+        }
+        #[cfg(not(spa_video_info_raw_has_flags))]
+        {
+            VideoFlags::NONE
+        }
     }
 
     pub fn set_modifier(&mut self, modifier: u64) {
-        self.0.modifier = modifier;
+        self.0.modifier = modifier as _;
     }
 
     pub fn modifier(self) -> u64 {
-        self.0.modifier
+        self.0.modifier as u64
     }
 
     pub fn set_size(&mut self, size: Rectangle) {
