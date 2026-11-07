@@ -4,6 +4,7 @@ mod output;
 mod progress;
 mod recorder;
 
+pub(crate) use encoder::RawVideoInput;
 pub use encoder::{encoder_label, is_hardware_encoder};
 pub use filters::{audio_filter, video_filter};
 pub use output::{format_bytes, format_duration};

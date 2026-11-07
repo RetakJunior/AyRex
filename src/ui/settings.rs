@@ -56,7 +56,11 @@ pub(crate) fn show_settings(ui: &mut egui::Ui, state: &mut AppState) {
         }
         #[cfg(target_os = "linux")]
         {
-            ui.small("Linux ekran yakalama için X11 oturumu gerekir; Wayland desteklenmiyor.");
+            if crate::capture::is_wayland_session() {
+                ui.small("Wayland kaydında Ubuntu ekran paylaşımı izni isteyecek; ekrandaki seçiciden kaydedilecek ekranı seç.");
+            } else {
+                ui.small("Linux ekran yakalama X11 oturumunu kullanıyor.");
+            }
         }
 
         ui.horizontal(|ui| {

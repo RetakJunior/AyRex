@@ -4,7 +4,7 @@ AyRex, Rust ile yazılmış; Windows ve Linux masaüstlerinde ekran kaydı ve ya
 
 ## Çalışan özellikler
 
-- Windows'ta DXGI Desktop Duplication / GDI, Linux X11 oturumunda x11grab ile ekran yakalama; canlı önizleme
+- Windows'ta DXGI Desktop Duplication / GDI; Linux Wayland oturumunda Ubuntu ekran paylaşımı izni ve PipeWire, X11 oturumunda x11grab ile ekran yakalama; canlı önizleme
 - Sahne oluşturma, kopyalama, adlandırma ve silme; sahne başına ekranla birlikte birden fazla pencere, kamera, görsel, video ve metin kaynağı
 - Önizlemede kaynakları sürükleyerek taşıma ve köşesinden boyutlandırma; konum, boyut ve kırpma ayarlarını kaydetme
 - Önizlemede sürükleyerek sahne başına özel monitör kayıt alanı seçme
@@ -46,7 +46,7 @@ Twitch RTMP adres biçimi: https://dev.twitch.tv/docs/video-broadcast/
 
 Windows x64 sürümü için Releases bölümündeki `AyRex.exe` dosyasını çalıştırın. Kayıt özelliği için FFmpeg ayrıca kurulmalı ve `ffmpeg.exe` PATH'te bulunmalıdır. Ayar ve kayıtlar kullanıcı profilinde tutulur.
 
-Linux x86_64 için Releases bölümündeki `AyRex-Linux-x86_64.AppImage` dosyasını indirin, çalıştırılabilir yapın (`chmod +x AyRex-Linux-x86_64.AppImage`) ve çalıştırın. Paket X11/XWayland, FFmpeg'in PulseAudio giriş desteği ve V4L2 kamera cihazları olan sistemler içindir. Wayland-only masaüstünde ekran kaydı bu sürümde desteklenmez; X11 oturumu gerekir. AppImage uygulama ve FFmpeg'i taşır, ancak Linux grafik/ses sunucularını ve ekran/kamera donanım sürücülerini sistemden kullanır; tüm dağıtımlarda ve donanımlarda çalışma garantisi verilemez.
+Linux x86_64 için Releases bölümündeki `AyRex-Linux-x86_64.AppImage` dosyasını indirin, çalıştırılabilir yapın (`chmod +x AyRex-Linux-x86_64.AppImage`) ve çalıştırın. Wayland oturumunda kayda başlarken Ubuntu ekran paylaşımı penceresinde ekran izni verip kaydedilecek ekranı seçin; görüntü PipeWire üzerinden alınır. X11 oturumunda FFmpeg `x11grab` kullanır. Paket FFmpeg'in PulseAudio giriş desteği, PipeWire/ekran paylaşım portalı ve V4L2 kamera cihazları olan sistemler içindir. AppImage uygulama ve FFmpeg'i taşır, ancak Linux grafik/ses sunucularını, PipeWire servisini, ekran paylaşım portalını ve ekran/kamera donanım sürücülerini sistemden kullanır; tüm dağıtımlarda ve donanımlarda çalışma garantisi verilemez.
 
 Gizlilik için uygulama açıldığında ekran yakalama yapılmaz. “Tek kare al” yalnızca bir ekran görüntüsü alır; devamlı ekran yakalama sadece kayıt başlatıldığında gerçekleşir.
 

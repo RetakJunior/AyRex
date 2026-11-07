@@ -16,6 +16,11 @@ use crate::{
     },
 };
 
+#[cfg(target_os = "linux")]
+use crate::capture::WaylandCapture;
+#[cfg(target_os = "linux")]
+use std::sync::mpsc::SyncSender;
+
 pub struct Recorder {
     child: Child,
     config: RecordingConfig,
@@ -26,6 +31,10 @@ pub struct Recorder {
     stderr_tail: Arc<Mutex<VecDeque<String>>>,
     progress_thread: Option<JoinHandle<()>>,
     stderr_thread: Option<JoinHandle<()>>,
+    #[cfg(target_os = "linux")]
+    wayland_capture_stop: Option<SyncSender<()>>,
+    #[cfg(target_os = "linux")]
+    wayland_capture_thread: Option<JoinHandle<Result<(), String>>>,
     warning: Option<String>,
 }
 
@@ -34,6 +43,16 @@ impl Recorder {
         fs::create_dir_all(&config.output_dir)
             .map_err(|error| format!("Could not create output folder: {error}"))?;
         let output_path = unique_output_path(&config.output_dir, config.container)?;
+        #[cfg(target_os = "linux")]
+        let mut wayland_capture = if crate::capture::is_wayland_session() {
+            Some(WaylandCapture::start(config.fps)?)
+        } else {
+            None
+        };
+        #[cfg(target_os = "linux")]
+        let raw_video_input = wayland_capture.as_ref().map(WaylandCapture::input);
+        #[cfg(not(target_os = "linux"))]
+        let raw_video_input = None;
         let replay_directory = if config.replay_buffer_seconds > 0 {
             let stamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -60,16 +79,34 @@ impl Recorder {
             &output_path,
             replay_directory.as_deref(),
             system_audio_port,
+            raw_video_input,
         );
         let mut child = match command.spawn() {
             Ok(child) => child,
             Err(error) => {
+                #[cfg(target_os = "linux")]
+                if let Some(capture) = wayland_capture.take() {
+                    capture.cancel();
+                }
                 if let Some(path) = &replay_directory {
                     let _ = fs::remove_dir_all(path);
                 }
                 return Err(format!("Could not start FFmpeg: {error}"));
             }
         };
+
+        #[cfg(target_os = "linux")]
+        let (wayland_capture_stop, wayland_capture_thread) =
+            if let Some(capture) = wayland_capture.take() {
+                let stdin = child
+                    .stdin
+                    .take()
+                    .expect("FFmpeg screen capture input should use stdin");
+                let (stop_sender, thread) = capture.pipe_frames(stdin);
+                (Some(stop_sender), Some(thread))
+            } else {
+                (None, None)
+            };
 
         let progress = Arc::new(Mutex::new(FfmpegProgress::default()));
         let stderr_tail = Arc::new(Mutex::new(VecDeque::new()));
@@ -92,6 +129,10 @@ impl Recorder {
             stderr_tail,
             progress_thread,
             stderr_thread,
+            #[cfg(target_os = "linux")]
+            wayland_capture_stop,
+            #[cfg(target_os = "linux")]
+            wayland_capture_thread,
             warning: None,
         })
     }
@@ -132,6 +173,8 @@ impl Recorder {
         if let Some(capture) = &self.system_audio_capture {
             capture.stop();
         }
+        #[cfg(target_os = "linux")]
+        self.stop_wayland_capture();
         if let Some(mut stdin) = self.child.stdin.take() {
             stdin
                 .write_all(b"q\n")
@@ -151,6 +194,8 @@ impl Recorder {
     }
 
     pub fn finish_readers(&mut self) -> Result<(), String> {
+        #[cfg(target_os = "linux")]
+        self.stop_wayland_capture();
         if let Some(mut capture) = self.system_audio_capture.take()
             && let Err(error) = capture.finish()
         {
@@ -164,6 +209,25 @@ impl Recorder {
                 .map_err(|_| "A FFmpeg output reader stopped unexpectedly.".to_owned())?;
         }
         Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    fn stop_wayland_capture(&mut self) {
+        if let Some(stop) = self.wayland_capture_stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(handle) = self.wayland_capture_thread.take() {
+            match handle.join() {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    self.warning = Some(format!("Wayland ekran yakalama durdu: {error}"));
+                }
+                Err(_) => {
+                    self.warning =
+                        Some("Wayland ekran yakalama işlemi beklenmedik biçimde durdu.".to_owned());
+                }
+            }
+        }
     }
 
     pub fn summary(&self, status: ExitStatus) -> Result<RecordingSummary, String> {
@@ -367,6 +431,8 @@ impl Drop for Recorder {
         if let Some(capture) = &self.system_audio_capture {
             capture.stop();
         }
+        #[cfg(target_os = "linux")]
+        self.stop_wayland_capture();
         if self.child.try_wait().ok().flatten().is_none() {
             if let Some(mut stdin) = self.child.stdin.take() {
                 let _ = stdin.write_all(b"q\n");

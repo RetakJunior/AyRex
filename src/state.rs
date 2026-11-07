@@ -11,6 +11,9 @@ use crate::{
     system::{discover_encoders, locate_ffmpeg},
 };
 
+#[cfg(target_os = "linux")]
+use crate::capture::is_wayland_session;
+
 pub struct AppState {
     pub displays: Vec<Display>,
     pub selected_display_id: Option<u32>,
@@ -34,10 +37,26 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(saved_settings: Option<RecordingSettings>) -> Self {
-        let (displays, mut notice) = match discover_displays() {
+        let (mut displays, mut notice) = match discover_displays() {
             Ok(displays) => (displays, None),
             Err(error) => (Vec::new(), Some(error)),
         };
+        #[cfg(target_os = "linux")]
+        if displays.is_empty() && is_wayland_session() {
+            displays.push(Display {
+                id: 0,
+                name: "Ubuntu ekranı (izin penceresinde seçilir)".to_owned(),
+                x: 0,
+                y: 0,
+                width: 1280,
+                height: 720,
+                primary: true,
+                dxgi_output_index: None,
+            });
+            notice = Some(
+                "Kayda başlayınca Ubuntu ekran paylaşımı izni isteyecek; kaydedilecek ekranı pencereden seç.".to_owned(),
+            );
+        }
         let (windows, window_error) = match discover_windows() {
             Ok(windows) => (windows, None),
             Err(error) => (Vec::new(), Some(error)),
@@ -188,6 +207,10 @@ impl AppState {
     }
 
     pub fn selected_config(&self) -> Result<RecordingConfig, String> {
+        #[cfg(target_os = "linux")]
+        let screen_capture_includes_windows = is_wayland_session();
+        #[cfg(not(target_os = "linux"))]
+        let screen_capture_includes_windows = false;
         let ffmpeg = self
             .ffmpeg
             .clone()
@@ -250,6 +273,7 @@ impl AppState {
         if config
             .window_title
             .as_ref()
+            .filter(|_| !screen_capture_includes_windows)
             .is_some_and(|title| !self.windows.iter().any(|window| &window.title == title))
         {
             return Err("Sahnede seçilen pencere artık bulunamıyor.".to_owned());
@@ -279,10 +303,11 @@ impl AppState {
                     return Err(format!("Sahnedeki kamera kullanılamıyor: {}", source.name));
                 }
                 SceneSourceKind::Window
-                    if !self
-                        .windows
-                        .iter()
-                        .any(|window| window.title == source.value) =>
+                    if !screen_capture_includes_windows
+                        && !self
+                            .windows
+                            .iter()
+                            .any(|window| window.title == source.value) =>
                 {
                     return Err(format!("Sahnedeki pencere bulunamadı: {}", source.name));
                 }

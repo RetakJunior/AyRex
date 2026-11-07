@@ -57,6 +57,8 @@ jobs:
           appdir="$PWD/AppDir"
           install -Dm755 target/release/ayrex "$appdir/usr/bin/ayrex"
           install -Dm755 "$(command -v ffmpeg)" "$appdir/usr/bin/ffmpeg"
+          install -Dm755 "$(pkg-config --variable=libdir libpipewire-0.3)/libpipewire-0.3.so.0" \
+            "$appdir/usr/lib/libpipewire-0.3.so.0"
           install -Dm644 src/logo/ayrex.png \
             "$appdir/usr/share/icons/hicolor/512x512/apps/io.github.retakjunior.AyRex.png"
           install -Dm644 packaging/linux/io.github.retakjunior.AyRex.desktop \
@@ -69,6 +71,8 @@ jobs:
             "$appdir/usr/share/doc/ayrex/THIRD_PARTY_NOTICES.txt"
           install -Dm644 licenses/FFmpeg-GPLv3.txt \
             "$appdir/usr/share/doc/ayrex/FFmpeg-GPLv3.txt"
+          install -Dm644 licenses/scrcap-MIT.txt \
+            "$appdir/usr/share/doc/ayrex/scrcap-MIT.txt"
           curl -L --fail --retry 3 \
             https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
             -o linuxdeploy

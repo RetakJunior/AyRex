@@ -6,9 +6,16 @@ use std::{
 
 use crate::config::{Container, RecordingConfig, SceneSource, SceneSourceKind, SourceTransform};
 
+#[derive(Clone, Debug)]
+pub(crate) struct RawVideoInput {
+    pub width: u32,
+    pub height: u32,
+    pub pixel_format: &'static str,
+}
+
 #[cfg(test)]
 pub fn build_ffmpeg_command(config: &RecordingConfig, output_path: &Path) -> Command {
-    build_ffmpeg_command_with_replay(config, output_path, None, None)
+    build_ffmpeg_command_with_replay(config, output_path, None, None, None)
 }
 
 pub(crate) fn build_ffmpeg_command_with_replay(
@@ -16,6 +23,7 @@ pub(crate) fn build_ffmpeg_command_with_replay(
     output_path: &Path,
     replay_directory: Option<&Path>,
     _system_audio_port: Option<u16>,
+    raw_video_input: Option<RawVideoInput>,
 ) -> Command {
     let replay_enabled = config.replay_buffer_seconds > 0 && replay_directory.is_some();
     let mut command = Command::new(&config.ffmpeg);
@@ -35,7 +43,21 @@ pub(crate) fn build_ffmpeg_command_with_replay(
     let use_dxgi_capture = config.use_desktop_duplication
         && config.display.dxgi_output_index.is_some()
         && !legacy_window_capture;
-    if legacy_window_capture && let Some(title) = &config.window_title {
+    if let Some(input) = raw_video_input {
+        let size = format!("{}x{}", input.width, input.height);
+        command.args([
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            input.pixel_format,
+            "-video_size",
+            &size,
+            "-framerate",
+            &config.fps.to_string(),
+            "-i",
+            "pipe:0",
+        ]);
+    } else if legacy_window_capture && let Some(title) = &config.window_title {
         #[cfg(windows)]
         command.args([
             "-f",
@@ -457,6 +479,12 @@ fn append_scene_source_inputs(
                 Some(allocate_input_index(next_input))
             }
             SceneSourceKind::Window => {
+                #[cfg(target_os = "linux")]
+                if crate::capture::is_wayland_session() {
+                    // Portal capture already contains every visible window on the selected
+                    // monitor; XWayland cannot capture that window independently.
+                    continue;
+                }
                 #[cfg(windows)]
                 command.args([
                     "-thread_queue_size",
@@ -989,6 +1017,7 @@ mod tests {
             Path::new("recordings/mixed.mkv"),
             None,
             Some(45_321),
+            None,
         );
         let args = command
             .get_args()
@@ -1029,6 +1058,7 @@ mod tests {
             Path::new("recordings/mixed.mkv"),
             None,
             Some(45_321),
+            None,
         )
         .get_args()
         .map(|arg| arg.to_string_lossy().into_owned())
@@ -1054,6 +1084,7 @@ mod tests {
             Path::new("recordings/record.mkv"),
             Some(Path::new("recordings/.replay")),
             Some(45_321),
+            None,
         );
         let args = command
             .get_args()
@@ -1265,6 +1296,7 @@ mod tests {
             &config,
             Path::new("recordings/record.mkv"),
             Some(Path::new("recordings/.replay")),
+            None,
             None,
         );
         let args = command

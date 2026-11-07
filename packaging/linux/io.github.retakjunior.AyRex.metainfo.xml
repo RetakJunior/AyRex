@@ -6,12 +6,12 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <description>
-    <p>Record an X11 desktop, mix audio, and stream to RTMP, RTMPS, or SRT destinations.</p>
+    <p>Record Wayland desktops through the screen sharing portal and PipeWire, or X11 desktops, mix audio, and stream to RTMP, RTMPS, or SRT destinations.</p>
   </description>
   <launchable type="desktop-id">io.github.retakjunior.AyRex.desktop</launchable>
   <url type="homepage">https://github.com/RetakJunior/AyRex</url>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="0.1.4" date="2026-11-07"/>
+    <release version="0.1.5" date="2026-11-07"/>
   </releases>
 </component>

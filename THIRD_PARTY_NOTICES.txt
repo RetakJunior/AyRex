@@ -1,5 +1,12 @@
 AyRex third-party software notices
 
+scrcap 0.1.0-alpha.2
+--------------------
+AyRex uses the scrcap screen capture library for Wayland desktop capture through
+the XDG Desktop Portal and PipeWire. The MIT license is included in
+scrcap-MIT.txt.
+Upstream source: https://github.com/kingwingfly/scrcap
+
 wasapi-rs 0.26.0
 ----------------
 AyRex links the Rust WASAPI bindings by Henrik Enquist for Windows system audio
