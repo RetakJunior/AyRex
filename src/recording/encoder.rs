@@ -1193,10 +1193,17 @@ mod tests {
             assert!(args.contains("title=AyRex Test Window"));
         }
         #[cfg(target_os = "linux")]
-        assert!(args.contains("-window_id 0xea"));
+        if crate::capture::is_wayland_session() {
+            assert!(!args.contains("-window_id"));
+            assert!(args.contains("[merged_3]null[outv]"));
+        } else {
+            assert!(args.contains("-window_id 0xea"));
+            assert!(args.contains("[merged_4]null[outv]"));
+        }
         assert!(args.contains("-i logo one.png"));
         assert!(args.contains("-i logo two.png"));
         assert_eq!(args.matches("drawtext=").count(), 2);
+        #[cfg(windows)]
         assert!(args.contains("[merged_4]null[outv]"));
     }
 

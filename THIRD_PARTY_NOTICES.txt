@@ -1,11 +1,19 @@
 AyRex third-party software notices
 
-scrcap 0.1.0-alpha.2
+scap 0.1.0-beta.1 (locally patched)
 --------------------
-AyRex uses the scrcap screen capture library for Wayland desktop capture through
-the XDG Desktop Portal and PipeWire. The MIT license is included in
-scrcap-MIT.txt.
-Upstream source: https://github.com/kingwingfly/scrcap
+AyRex uses scap for Wayland desktop capture through the XDG Desktop Portal and
+PipeWire. The vendored source restricts PipeWire negotiation to BGRx, the only
+format consumed by AyRex's FFmpeg input. The MIT license is included in
+scap-MIT.txt.
+Upstream source: https://github.com/helmerapp/scap
+
+libspa 0.8.0 (locally patched)
+-----------------------------
+PipeWire's Rust SPA bindings are vendored to keep the PipeWire builder storage
+layout compatible with both Ubuntu 22.04 and newer PipeWire headers. The MIT
+license is included in libspa-MIT.txt.
+Upstream source: https://gitlab.freedesktop.org/pipewire/pipewire-rs
 
 wasapi-rs 0.26.0
 ----------------

@@ -3,11 +3,11 @@ use std::{
     process::ChildStdin,
     sync::mpsc::{self, SyncSender, TryRecvError},
     thread::{self, JoinHandle},
-    time::Duration,
 };
 
-use scrcap::{
-    CaptureConfig, CaptureDesc, CaptureDescriptor, Target, VideoConfig, frame::VideoFrame,
+use scap::{
+    capturer::{Capturer, Options},
+    frame::{Frame, VideoFrame},
 };
 
 use crate::recording::RawVideoInput;
@@ -18,29 +18,42 @@ pub(crate) fn is_wayland_session() -> bool {
 }
 
 pub(crate) struct WaylandCapture {
-    capture: CaptureDesc,
+    capture: Capturer,
     first_frame: Vec<u8>,
     input: RawVideoInput,
 }
 
 impl WaylandCapture {
     pub(crate) fn start(fps: u32) -> Result<Self, String> {
-        let capture = CaptureConfig {
-            video: VideoConfig {
-                channel_capacity: 2,
-                hide: Vec::new(),
-                target: Target::Primary,
-                fps: Some(fps.max(1)),
-            },
-            audio: None,
-        }
-        .create()
+        let capture = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Capturer::build(Options {
+                fps: fps.max(1),
+                show_cursor: true,
+                ..Options::default()
+            })
+        }))
+        .map_err(|_| {
+            "Ubuntu ekran paylaşımı başlatılamadı. İzin penceresinde ekran seçip paylaşımı onaylayın."
+                .to_owned()
+        })?
         .map_err(|error| format!("Ubuntu ekran paylaşımı başlatılamadı: {error}"))?;
-        let frame = capture
-            .video()
-            .recv_timeout(Duration::from_secs(15))
-            .map_err(|error| format!("PipeWire'dan ekran karesi alınamadı: {error}"))?;
-        let (input, first_frame) = raw_video_frame(frame)?;
+
+        let mut capture = capture;
+        capture.start_capture();
+        let frame = match capture.get_next_frame() {
+            Ok(frame) => frame,
+            Err(error) => {
+                capture.stop_capture();
+                return Err(format!("PipeWire'dan ekran karesi alınamadı: {error}"));
+            }
+        };
+        let (input, first_frame) = match raw_video_frame(frame) {
+            Ok(frame) => frame,
+            Err(error) => {
+                capture.stop_capture();
+                return Err(error);
+            }
+        };
 
         Ok(Self {
             capture,
@@ -53,8 +66,8 @@ impl WaylandCapture {
         self.input.clone()
     }
 
-    pub(crate) fn cancel(self) {
-        self.capture.terminate();
+    pub(crate) fn cancel(mut self) {
+        self.capture.stop_capture();
     }
 
     pub(crate) fn pipe_frames(
@@ -63,48 +76,43 @@ impl WaylandCapture {
     ) -> (SyncSender<()>, JoinHandle<Result<(), String>>) {
         let (stop_sender, stop_receiver) = mpsc::sync_channel(1);
         let handle = thread::spawn(move || {
-            let capture = self.capture;
+            let Self {
+                mut capture,
+                first_frame,
+                input,
+            } = self;
             let mut stdin = stdin;
-            let input = self.input;
 
             let result = (|| {
                 stdin
-                    .write_all(&self.first_frame)
+                    .write_all(&first_frame)
                     .map_err(|error| format!("FFmpeg'e ekran karesi gönderilemedi: {error}"))?;
 
                 loop {
+                    let frame = capture
+                        .get_next_frame()
+                        .map_err(|error| format!("PipeWire ekran akışı kapandı: {error}"))?;
+
                     match stop_receiver.try_recv() {
                         Ok(()) | Err(TryRecvError::Disconnected) => break,
                         Err(TryRecvError::Empty) => {}
                     }
 
-                    match capture.video().recv_timeout(Duration::from_millis(100)) {
-                        Ok(frame) => {
-                            let (next_input, data) = raw_video_frame(frame)?;
-                            if next_input.width != input.width
-                                || next_input.height != input.height
-                                || next_input.pixel_format != input.pixel_format
-                            {
-                                return Err(
-                                    "Ekran kayıt sırasında boyut veya biçim değiştirdi.".to_owned()
-                                );
-                            }
-                            stdin.write_all(&data).map_err(|error| {
-                                format!("FFmpeg'e ekran karesi gönderilemedi: {error}")
-                            })?;
-                        }
-                        Err(crossbeam_channel::RecvTimeoutError::Timeout) => continue,
-                        Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
-                            return Err(
-                                "PipeWire ekran akışı beklenmedik biçimde kapandı.".to_owned()
-                            );
-                        }
+                    let (next_input, data) = raw_video_frame(frame)?;
+                    if next_input.width != input.width
+                        || next_input.height != input.height
+                        || next_input.pixel_format != input.pixel_format
+                    {
+                        return Err("Ekran kayıt sırasında boyut veya biçim değiştirdi.".to_owned());
                     }
+                    stdin
+                        .write_all(&data)
+                        .map_err(|error| format!("FFmpeg'e ekran karesi gönderilemedi: {error}"))?;
                 }
                 Ok(())
             })();
 
-            capture.terminate();
+            capture.stop_capture();
             drop(stdin);
             result
         });
@@ -112,24 +120,19 @@ impl WaylandCapture {
     }
 }
 
-fn raw_video_frame(frame: VideoFrame) -> Result<(RawVideoInput, Vec<u8>), String> {
-    use scrcap::PixFmt;
-
-    let pixel_format = match frame.pix_fmt {
-        PixFmt::Bgra => "bgra",
-        PixFmt::Rgba => "rgba",
-        PixFmt::Argb => "argb",
-        PixFmt::Abgr => "abgr",
-        PixFmt::Bgr0 => "bgr0",
-        PixFmt::Rgb0 => "rgb0",
+fn raw_video_frame(frame: Frame) -> Result<(RawVideoInput, Vec<u8>), String> {
+    let (width, height, data) = match frame {
+        Frame::Video(VideoFrame::BGRx(frame)) => (frame.width, frame.height, frame.data),
+        Frame::Video(VideoFrame::BGR0(frame)) => (frame.width, frame.height, frame.data),
         _ => return Err("PipeWire beklenmeyen bir piksel biçimi gönderdi.".to_owned()),
     };
-    let (width, height) = frame.size;
+    let width = u32::try_from(width).map_err(|_| "Ekran genişliği geçersiz.".to_owned())?;
+    let height = u32::try_from(height).map_err(|_| "Ekran yüksekliği geçersiz.".to_owned())?;
     let expected_size = (width as usize)
         .checked_mul(height as usize)
-        .and_then(|pixels| pixels.checked_mul(frame.pix_fmt.bytes_per_pixel()))
+        .and_then(|pixels| pixels.checked_mul(4))
         .ok_or_else(|| "Ekran çözünürlüğü çok büyük.".to_owned())?;
-    if width == 0 || height == 0 || frame.vframe.len() != expected_size {
+    if width == 0 || height == 0 || data.len() != expected_size {
         return Err("PipeWire eksik veya geçersiz bir ekran karesi gönderdi.".to_owned());
     }
 
@@ -137,8 +140,8 @@ fn raw_video_frame(frame: VideoFrame) -> Result<(RawVideoInput, Vec<u8>), String
         RawVideoInput {
             width,
             height,
-            pixel_format,
+            pixel_format: "bgr0",
         },
-        frame.vframe,
+        data,
     ))
 }

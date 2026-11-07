@@ -1,6 +1,6 @@
 [package]
 name = "ayrex"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 
 [dependencies]
@@ -21,8 +21,10 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Syste
 windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-crossbeam-channel = "0.5"
-scrcap = "=0.1.0-alpha.2"
+scap = { path = "vendor/scap" }
+
+[patch.crates-io]
+libspa = { path = "vendor/libspa" }
 
 [profile.release]
 lto = "thin"
