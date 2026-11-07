@@ -105,8 +105,33 @@ jobs:
           path: AyRex-Linux-x86_64.AppImage
           if-no-files-found: error
 
+  flatpak:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flatpak build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install --system --assumeyes flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//24.08
+      - name: Build Flatpak
+        run: |
+          flatpak-builder --force-clean --repo=repo build-dir \
+            packaging/flatpak/io.github.retakjunior.AyRex.json
+          flatpak build-bundle repo AyRex-Linux-x86_64.flatpak \
+            io.github.retakjunior.AyRex stable
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-release
+          path: AyRex-Linux-x86_64.flatpak
+          if-no-files-found: error
+
   publish:
-    needs: [windows, linux]
+    needs: [windows, linux, flatpak]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -119,3 +144,4 @@ jobs:
             release-assets/windows-release/AyRex-Windows-x64.zip
             release-assets/windows-release/AyRex.exe
             release-assets/linux-release/AyRex-Linux-x86_64.AppImage
+            release-assets/flatpak-release/AyRex-Linux-x86_64.flatpak
