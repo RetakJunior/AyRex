@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.8)"
+        required: true
+        default: "v0.1.8"
 
 permissions:
   contents: write
@@ -75,10 +81,10 @@ jobs:
             "$appdir/usr/share/doc/ayrex/scap-MIT.txt"
           install -Dm644 licenses/libspa-MIT.txt \
             "$appdir/usr/share/doc/ayrex/libspa-MIT.txt"
-          curl -L --fail --retry 3 \
+          curl -L --fail --retry 5 --retry-delay 10 --connect-timeout 30 \
             https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
             -o linuxdeploy
-          curl -L --fail --retry 3 \
+          curl -L --fail --retry 5 --retry-delay 10 --connect-timeout 30 \
             https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage \
             -o linuxdeploy-plugin-appimage
           chmod +x linuxdeploy linuxdeploy-plugin-appimage
@@ -105,7 +111,9 @@ jobs:
           path: release-assets
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name || github.event.inputs.tag }}
           generate_release_notes: true
+          fail_on_unmatched_files: false
           files: |
             release-assets/windows-release/AyRex.exe
             release-assets/linux-release/AyRex-Linux-x86_64.AppImage
