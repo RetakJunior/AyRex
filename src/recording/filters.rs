@@ -1,16 +1,31 @@
 use crate::config::RecordingConfig;
 
 pub fn video_filter(config: &RecordingConfig) -> String {
-    let filter = format!(
-        "scale={}:{}:flags=bilinear,eq=brightness={:.3}:contrast={:.3}:saturation={:.3},unsharp=5:5:{:.2}:5:5:0",
-        config.width,
-        config.height,
-        config.brightness.clamp(-0.5, 0.5),
-        config.contrast.clamp(0.0, 2.0),
-        config.saturation.clamp(0.0, 3.0),
-        config.sharpen.clamp(0.0, 2.0)
-    );
-    filter
+    let mut filters = vec![format!(
+        "scale={}:{}:flags=bilinear",
+        config.width, config.height
+    )];
+
+    let has_eq = config.brightness.abs() > 0.001
+        || (config.contrast - 1.0).abs() > 0.001
+        || (config.saturation - 1.0).abs() > 0.001;
+    if has_eq {
+        filters.push(format!(
+            "eq=brightness={:.3}:contrast={:.3}:saturation={:.3}",
+            config.brightness.clamp(-0.5, 0.5),
+            config.contrast.clamp(0.0, 2.0),
+            config.saturation.clamp(0.0, 3.0)
+        ));
+    }
+
+    if config.sharpen > 0.01 {
+        filters.push(format!(
+            "unsharp=5:5:{:.2}:5:5:0",
+            config.sharpen.clamp(0.0, 2.0)
+        ));
+    }
+
+    filters.join(",")
 }
 
 pub fn audio_filter(config: &RecordingConfig) -> String {

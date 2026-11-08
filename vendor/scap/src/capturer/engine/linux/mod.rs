@@ -29,7 +29,7 @@ use pw::{
 
 use crate::{
     capturer::Options,
-    frame::{BGRxFrame, Frame, VideoFrame},
+    frame::{BGRAFrame, BGRxFrame, Frame, RGBFrame, RGBxFrame, VideoFrame},
 };
 
 use self::{error::LinCapError, portal::ScreenCastPortal};
@@ -103,19 +103,44 @@ fn process_callback(stream: &StreamRef, user_data: &mut ListenerUserData) {
             let data = unsafe { &*(*buffer).datas };
             if !data.data.is_null() && !data.chunk.is_null() {
                 let size = unsafe { (*data.chunk).size as usize };
-                if size > 0 && user_data.format.format() == VideoFormat::BGRx {
+                if size > 0 {
                     let frame_size = user_data.format.size();
                     let frame_data = unsafe {
                         std::slice::from_raw_parts(data.data.cast::<u8>(), size).to_vec()
                     };
-                    if let Err(error) = user_data.tx.send(Frame::Video(VideoFrame::BGRx(
-                        BGRxFrame {
+                    let frame = match user_data.format.format() {
+                        VideoFormat::BGRx => Frame::Video(VideoFrame::BGRx(BGRxFrame {
                             display_time: SystemTime::now(),
                             width: frame_size.width as i32,
                             height: frame_size.height as i32,
                             data: frame_data,
-                        },
-                    ))) {
+                        })),
+                        VideoFormat::BGRA => Frame::Video(VideoFrame::BGRA(BGRAFrame {
+                            display_time: SystemTime::now(),
+                            width: frame_size.width as i32,
+                            height: frame_size.height as i32,
+                            data: frame_data,
+                        })),
+                        VideoFormat::RGBx => Frame::Video(VideoFrame::RGBx(RGBxFrame {
+                            display_time: SystemTime::now(),
+                            width: frame_size.width as i32,
+                            height: frame_size.height as i32,
+                            data: frame_data,
+                        })),
+                        VideoFormat::RGB => Frame::Video(VideoFrame::RGB(RGBFrame {
+                            display_time: SystemTime::now(),
+                            width: frame_size.width as i32,
+                            height: frame_size.height as i32,
+                            data: frame_data,
+                        })),
+                        _ => Frame::Video(VideoFrame::BGRx(BGRxFrame {
+                            display_time: SystemTime::now(),
+                            width: frame_size.width as i32,
+                            height: frame_size.height as i32,
+                            data: frame_data,
+                        })),
+                    };
+                    if let Err(error) = user_data.tx.send(frame) {
                         eprintln!("{error}");
                     }
                 }

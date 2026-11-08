@@ -121,16 +121,21 @@ impl WaylandCapture {
 }
 
 fn raw_video_frame(frame: Frame) -> Result<(RawVideoInput, Vec<u8>), String> {
-    let (width, height, data) = match frame {
-        Frame::Video(VideoFrame::BGRx(frame)) => (frame.width, frame.height, frame.data),
-        Frame::Video(VideoFrame::BGR0(frame)) => (frame.width, frame.height, frame.data),
+    let (width, height, data, pixel_format) = match frame {
+        Frame::Video(VideoFrame::BGRx(frame)) => (frame.width, frame.height, frame.data, "bgr0"),
+        Frame::Video(VideoFrame::BGR0(frame)) => (frame.width, frame.height, frame.data, "bgr0"),
+        Frame::Video(VideoFrame::BGRA(frame)) => (frame.width, frame.height, frame.data, "bgra"),
+        Frame::Video(VideoFrame::RGBx(frame)) => (frame.width, frame.height, frame.data, "rgb0"),
+        Frame::Video(VideoFrame::RGB(frame)) => (frame.width, frame.height, frame.data, "rgb24"),
+        Frame::Video(VideoFrame::XBGR(frame)) => (frame.width, frame.height, frame.data, "0bgr"),
         _ => return Err("PipeWire beklenmeyen bir piksel biçimi gönderdi.".to_owned()),
     };
     let width = u32::try_from(width).map_err(|_| "Ekran genişliği geçersiz.".to_owned())?;
     let height = u32::try_from(height).map_err(|_| "Ekran yüksekliği geçersiz.".to_owned())?;
+    let bpp = if pixel_format == "rgb24" { 3 } else { 4 };
     let expected_size = (width as usize)
         .checked_mul(height as usize)
-        .and_then(|pixels| pixels.checked_mul(4))
+        .and_then(|pixels| pixels.checked_mul(bpp))
         .ok_or_else(|| "Ekran çözünürlüğü çok büyük.".to_owned())?;
     if width == 0 || height == 0 || data.len() != expected_size {
         return Err("PipeWire eksik veya geçersiz bir ekran karesi gönderdi.".to_owned());
@@ -140,7 +145,7 @@ fn raw_video_frame(frame: Frame) -> Result<(RawVideoInput, Vec<u8>), String> {
         RawVideoInput {
             width,
             height,
-            pixel_format: "bgr0",
+            pixel_format,
         },
         data,
     ))

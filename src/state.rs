@@ -37,6 +37,7 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(saved_settings: Option<RecordingSettings>) -> Self {
+        #[allow(unused_mut)]
         let (mut displays, mut notice) = match discover_displays() {
             Ok(displays) => (displays, None),
             Err(error) => (Vec::new(), Some(error)),
@@ -70,6 +71,7 @@ impl AppState {
             .or_else(|| displays.first())
             .map(|display| display.id);
         let ffmpeg = locate_ffmpeg();
+        let has_saved_settings = saved_settings.is_some();
         let mut settings = saved_settings.unwrap_or_default();
         let (stream_key, custom_stream_url) = detach_stream_credentials(&mut settings);
         if settings.scenes.is_empty() {
@@ -155,6 +157,13 @@ impl AppState {
             });
         }
 
+        if !has_saved_settings {
+            if let Some(hw) = encoders.iter().find(|e| {
+                *e == "h264_nvenc" || *e == "h264_qsv" || *e == "h264_amf"
+            }) {
+                settings.encoder = hw.clone();
+            }
+        }
         if !encoders.iter().any(|encoder| encoder == &settings.encoder) {
             if let Some(encoder) = encoders.first() {
                 settings.encoder = encoder.clone();

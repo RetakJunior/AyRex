@@ -1,6 +1,11 @@
 use std::{
-    sync::mpsc::{self, Receiver, SyncSender},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, Receiver, SyncSender},
+    },
     thread,
+    time::Duration,
 };
 
 use xcap::{Monitor, Window};
@@ -120,30 +125,39 @@ enum PreviewMessage {
 }
 
 pub struct PreviewCapture {
+    running: Arc<AtomicBool>,
     receiver: Receiver<PreviewMessage>,
 }
 
 impl PreviewCapture {
     pub fn start(monitor_id: u32) -> Self {
-        let (sender, receiver) = mpsc::sync_channel(1);
-        thread::spawn(move || capture_once(monitor_id, sender));
-        Self { receiver }
+        let running = Arc::new(AtomicBool::new(true));
+        let running_worker = Arc::clone(&running);
+        let (sender, receiver) = mpsc::sync_channel(2);
+        thread::spawn(move || preview_worker(monitor_id, running_worker, sender));
+        Self { running, receiver }
     }
 
     pub fn try_receive(&self) -> Result<Option<PreviewFrame>, String> {
-        match self.receiver.try_recv() {
-            Ok(PreviewMessage::Frame(frame)) => Ok(Some(frame)),
-            Ok(PreviewMessage::Error(error)) => Err(error),
-            Err(mpsc::TryRecvError::Empty) => Ok(None),
-            Err(mpsc::TryRecvError::Disconnected) => {
-                Err("Ekran yakalama işlemi beklenmedik biçimde durdu.".to_owned())
+        let mut latest = None;
+        while let Ok(message) = self.receiver.try_recv() {
+            match message {
+                PreviewMessage::Frame(frame) => latest = Some(frame),
+                PreviewMessage::Error(error) => return Err(error),
             }
         }
+        Ok(latest)
     }
 }
 
-fn capture_once(monitor_id: u32, sender: SyncSender<PreviewMessage>) {
-    let capture_result = Monitor::all()
+impl Drop for PreviewCapture {
+    fn drop(&mut self) {
+        self.running.store(false, Ordering::Relaxed);
+    }
+}
+
+fn capture_monitor_frame(monitor_id: u32) -> Result<PreviewFrame, String> {
+    Monitor::all()
         .map_err(|error| error.to_string())
         .and_then(|monitors| {
             monitors
@@ -156,10 +170,26 @@ fn capture_once(monitor_id: u32, sender: SyncSender<PreviewMessage>) {
             width: image.width() as usize,
             height: image.height() as usize,
             pixels: image.into_raw(),
-        });
-    let message = match capture_result {
-        Ok(frame) => PreviewMessage::Frame(frame),
-        Err(error) => PreviewMessage::Error(error),
-    };
-    let _ = sender.send(message);
+        })
+}
+
+fn preview_worker(monitor_id: u32, running: Arc<AtomicBool>, sender: SyncSender<PreviewMessage>) {
+    // Smooth, low-impact preview at ~15 FPS (66ms interval)
+    while running.load(Ordering::Relaxed) {
+        let start = std::time::Instant::now();
+        match capture_monitor_frame(monitor_id) {
+            Ok(frame) => {
+                let _ = sender.try_send(PreviewMessage::Frame(frame));
+            }
+            Err(error) => {
+                let _ = sender.try_send(PreviewMessage::Error(error));
+                break;
+            }
+        }
+        let elapsed = start.elapsed();
+        let target = Duration::from_millis(66);
+        if elapsed < target {
+            thread::sleep(target - elapsed);
+        }
+    }
 }

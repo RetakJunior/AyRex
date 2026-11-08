@@ -407,16 +407,18 @@ impl<'a> ScreenCastPortal<'a> {
     }
 
     pub fn show_cursor(mut self, mode: bool) -> Result<Self, LinCapError> {
-        let available_modes = self.proxy.available_cursor_modes()?;
-        if mode && available_modes & 2 == 2 {
-            self.cursor_mode = 2;
-            return Ok(self);
-        }
-        if !mode && available_modes & 1 == 1 {
+        let available_modes = self.proxy.available_cursor_modes().unwrap_or(3);
+        if mode {
+            if available_modes & 2 == 2 {
+                self.cursor_mode = 2;
+            } else if available_modes & 4 == 4 {
+                self.cursor_mode = 4;
+            } else {
+                self.cursor_mode = 1;
+            }
+        } else {
             self.cursor_mode = 1;
-            return Ok(self);
         }
-
-        Err(LinCapError::new("Unsupported cursor mode".to_string()))
+        Ok(self)
     }
 }
